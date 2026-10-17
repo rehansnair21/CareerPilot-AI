@@ -21,113 +21,85 @@ import {
 } from 'lucide-react';
 
 // ─── Google Sign-In Button Component ──────────────────────────────────────────
-const GoogleSignInButton = ({ onSuccess, onError, role }) => {
-  const btnRef = useRef(null);
-  const [googleLoaded, setGoogleLoaded] = useState(false);
-  const callbackRef = useRef({ onSuccess, onError });
+const GoogleSignInButton = ({ id = 'google-btn' }) => {
+  const containerRef = useRef(null);
+  const [rendered, setRendered] = useState(false);
 
   useEffect(() => {
-    callbackRef.current = { onSuccess, onError };
-  }, [onSuccess, onError]);
+    let checkTimer = null;
+    let isMounted = true;
 
-  useEffect(() => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (!clientId) {
-      console.warn('[Google Auth]: VITE_GOOGLE_CLIENT_ID environment variable is missing.');
-      return;
-    }
-
-    const initAndRender = () => {
-      if (!window.google?.accounts?.id || !btnRef.current) return;
+    const tryRender = () => {
+      if (!isMounted) return false;
+      if (!window.google?.accounts?.id || !containerRef.current) return false;
 
       try {
-        window.google.accounts.id.initialize({
-          client_id: clientId,
-          callback: async (response) => {
-            if (response.credential) {
-              await callbackRef.current.onSuccess(response.credential);
-            } else {
-              callbackRef.current.onError('Google Sign-In was cancelled or failed. Please try again.');
-            }
-          },
-          use_fedcm_for_prompt: true,
-          auto_select: false,
+        containerRef.current.innerHTML = '';
+        window.google.accounts.id.renderButton(containerRef.current, {
+          theme: 'outline',
+          size: 'large',
+          type: 'standard',
+          text: 'continue_with',
+          shape: 'rectangular',
+          logo_alignment: 'center',
+          width: 320,
         });
-
-        // Clear container and render official Google Sign-In button
-        if (btnRef.current) {
-          btnRef.current.innerHTML = '';
-          const parentWidth = btnRef.current.parentElement?.offsetWidth || 340;
-          const targetWidth = Math.min(Math.max(parentWidth, 240), 400);
-
-          window.google.accounts.id.renderButton(btnRef.current, {
-            theme: 'outline',
-            size: 'large',
-            type: 'standard',
-            text: 'continue_with',
-            shape: 'rectangular',
-            logo_alignment: 'center',
-            width: targetWidth,
-          });
-        }
-
-        setGoogleLoaded(true);
+        if (isMounted) setRendered(true);
+        return true;
       } catch (err) {
         console.error('[Google GSI Render Error]:', err);
+        return false;
       }
     };
 
-    const existingScript = document.getElementById('google-gsi-script');
-    if (existingScript) {
-      if (window.google?.accounts?.id) {
-        initAndRender();
-      } else {
-        existingScript.addEventListener('load', initAndRender);
-      }
-      return;
+    if (!tryRender()) {
+      checkTimer = setInterval(() => {
+        if (tryRender()) {
+          clearInterval(checkTimer);
+        }
+      }, 200);
     }
 
-    const script = document.createElement('script');
-    script.id = 'google-gsi-script';
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    script.onload = initAndRender;
-    script.onerror = () => console.error('Failed to load Google GSI script');
-    document.head.appendChild(script);
+    return () => {
+      isMounted = false;
+      if (checkTimer) clearInterval(checkTimer);
+    };
   }, []);
 
   return (
-    <div style={{ width: '100%', display: 'flex', justifyContent: 'center', minHeight: '44px', margin: '4px 0' }}>
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '4px 0', minHeight: '44px' }}>
+      {!rendered && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+            maxWidth: '320px',
+            height: '40px',
+            background: '#ffffff',
+            border: '1.5px solid #e2e8f0',
+            borderRadius: '10px',
+            fontSize: '14px',
+            fontWeight: '600',
+            color: '#64748b',
+          }}
+        >
+          Loading Google Sign-In...
+        </div>
+      )}
+      {/* Container is completely empty of React-managed elements to prevent removeChild crashes */}
       <div
-        ref={btnRef}
+        id={id}
+        ref={containerRef}
         style={{
-          width: '100%',
-          display: 'flex',
+          display: rendered ? 'flex' : 'none',
           justifyContent: 'center',
           alignItems: 'center',
+          width: '100%',
+          minHeight: '40px',
         }}
-      >
-        {!googleLoaded && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '100%',
-              padding: '11px 20px',
-              background: '#ffffff',
-              border: '1.5px solid #e2e8f0',
-              borderRadius: '10px',
-              fontSize: '14px',
-              fontWeight: '600',
-              color: '#64748b',
-            }}
-          >
-            Loading Google Sign-In...
-          </div>
-        )}
-      </div>
+      />
     </div>
   );
 };
@@ -315,6 +287,74 @@ export const AuthPage = ({ initialMode = 'login' }) => {
     }
   };
 
+  // Ref tracking current auth state for single global Google callback
+  const googleAuthRef = useRef({});
+  useEffect(() => {
+    googleAuthRef.current = {
+      isRightPanelActive,
+      loginRole: loginData.role,
+      regRole: regData.role,
+      handleGoogleLoginSuccess,
+      handleGoogleRegSuccess,
+      setLoginError,
+      setRegError,
+    };
+  }, [isRightPanelActive, loginData.role, regData.role]);
+
+  // Initialize Google Identity Services exactly ONCE per page
+  useEffect(() => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      console.warn('[Google Auth]: VITE_GOOGLE_CLIENT_ID is not configured.');
+      return;
+    }
+
+    const initGoogleGsi = () => {
+      if (!window.google?.accounts?.id) return;
+      try {
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: async (response) => {
+            const state = googleAuthRef.current;
+            if (response.credential) {
+              if (state.isRightPanelActive) {
+                await state.handleGoogleRegSuccess(response.credential);
+              } else {
+                await state.handleGoogleLoginSuccess(response.credential);
+              }
+            } else {
+              const errFn = state.isRightPanelActive ? state.setRegError : state.setLoginError;
+              errFn('Google Sign-In was cancelled or failed. Please try again.');
+            }
+          },
+          use_fedcm_for_prompt: true,
+          auto_select: false,
+        });
+      } catch (err) {
+        console.error('[Google GSI Init Error]:', err);
+      }
+    };
+
+    const existingScript = document.getElementById('google-gsi-script');
+    if (existingScript) {
+      if (window.google?.accounts?.id) {
+        initGoogleGsi();
+      } else {
+        existingScript.addEventListener('load', initGoogleGsi);
+      }
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = 'google-gsi-script';
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = initGoogleGsi;
+    script.onerror = () => console.error('Failed to load Google GSI script');
+    document.head.appendChild(script);
+  }, []);
+
   // Handle Registration Submit
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
@@ -486,11 +526,7 @@ export const AuthPage = ({ initialMode = 'login' }) => {
             </div>
 
             {/* Google Sign-Up Button */}
-            <GoogleSignInButton
-              role={regData.role}
-              onSuccess={handleGoogleRegSuccess}
-              onError={(msg) => setRegError(msg)}
-            />
+            <GoogleSignInButton id="google-signup-btn" />
 
             <OrDivider />
 
@@ -657,11 +693,7 @@ export const AuthPage = ({ initialMode = 'login' }) => {
             </div>
 
             {/* Google Sign-In Button */}
-            <GoogleSignInButton
-              role={loginData.role}
-              onSuccess={handleGoogleLoginSuccess}
-              onError={(msg) => setLoginError(msg)}
-            />
+            <GoogleSignInButton id="google-signin-btn" />
 
             <OrDivider />
 
