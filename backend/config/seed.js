@@ -4,6 +4,11 @@ import Recruiter from '../models/Recruiter.js';
 import Mentor from '../models/Mentor.js';
 
 export const seedDefaultUsers = async () => {
+  // Do not automatically seed demo accounts with hardcoded passwords in production
+  if (process.env.NODE_ENV === 'production' && process.env.SEED_DEMO_USERS !== 'true') {
+    return;
+  }
+
   try {
     const demoAccounts = [
       {

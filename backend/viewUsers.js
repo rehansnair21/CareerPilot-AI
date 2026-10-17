@@ -19,7 +19,6 @@ const viewUsers = async () => {
     const options = { serverSelectionTimeoutMS: 4000 };
     if (targetUri.includes('mongodb+srv://') || targetUri.includes('ssl=true') || targetUri.includes('tls=true')) {
       options.tls = true;
-      options.tlsAllowInvalidCertificates = true;
     }
     conn = await mongoose.connect(targetUri, options);
     console.log(`[Connected]: Host: ${conn.connection.host} | DB: ${conn.connection.name}`);

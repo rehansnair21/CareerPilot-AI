@@ -1,6 +1,17 @@
 import dotenv from 'dotenv';
-// Load environment variables before anything else
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Load environment variables reliably from backend/.env regardless of CWD
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 dotenv.config();
+
+if (!process.env.JWT_SECRET) {
+  console.error('[FATAL]: JWT_SECRET environment variable is not set. Server cannot start securely.');
+  process.exit(1);
+}
 
 import express from 'express';
 import cors from 'cors';
@@ -31,9 +42,50 @@ app.use((req, res, next) => {
 });
 
 // Middleware with 10MB limit for JSON body (supports image Base64 profile photos)
+// CORS: production allows only the explicitly configured frontend origin.
+// Parse explicitly allowed frontend origins from environment
+const getAllowedOrigins = () => {
+  const origins = [];
+  if (process.env.CLIENT_URL) {
+    process.env.CLIENT_URL.split(',').forEach((url) => {
+      const normalized = url.trim().replace(/\/+$/, '');
+      if (normalized && !origins.includes(normalized)) {
+        origins.push(normalized);
+      }
+    });
+  } else {
+    console.warn('[CORS Warning]: CLIENT_URL environment variable is not set. Cross-origin requests from frontend may be blocked in production.');
+  }
+
+  // Allow local frontend dev servers when not in production
+  if (process.env.NODE_ENV !== 'production') {
+    const devOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000'];
+    devOrigins.forEach((dev) => {
+      if (!origins.includes(dev)) origins.push(dev);
+    });
+  }
+
+  return origins;
+};
+
+const allowedOrigins = getAllowedOrigins();
+
 app.use(cors({
-  origin: [process.env.CLIENT_URL || 'http://localhost:5173', 'http://localhost:5173'],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g. mobile apps, curl, Postman, server-to-server)
+    if (!origin) return callback(null, true);
+
+    const normalizedOrigin = origin.trim().replace(/\/+$/, '');
+    if (allowedOrigins.includes(normalizedOrigin)) {
+      return callback(null, true);
+    }
+
+    console.warn(`[CORS Blocked]: Origin "${origin}" is not in allowed origins:`, allowedOrigins);
+    return callback(new Error(`CORS: Origin "${origin}" is not allowed`));
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));

@@ -6,13 +6,18 @@ import Recruiter from '../models/Recruiter.js';
 import Admin from '../models/Admin.js';
 import Mentor from '../models/Mentor.js';
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const getGoogleClient = () => new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Helper to generate JWT token
+// JWT_SECRET MUST be set in environment variables — no insecure fallback.
 const generateToken = (id, email = '') => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('FATAL: JWT_SECRET environment variable is not set. Server cannot start securely.');
+  }
   return jwt.sign(
     { id, email },
-    process.env.JWT_SECRET || 'career_pilot_super_secret_jwt_key_2026_blue_white_auth',
+    secret,
     { expiresIn: '30d' }
   );
 };
@@ -220,7 +225,7 @@ export const loginUser = async (req, res) => {
   try {
     const rawIdentifier = req.body.email || req.body.username || req.body.identifier || req.body.name || '';
     const rawPassword = req.body.password || '';
-    const selectedRole = req.body.role ? String(req.body.role).toLowerCase() : '';
+    const selectedRole = req.body.role ? String(req.body.role).toLowerCase().trim() : '';
 
     if (!rawIdentifier || !rawPassword) {
       return res.status(400).json({
@@ -233,9 +238,9 @@ export const loginUser = async (req, res) => {
     const cleanPassword = String(rawPassword).trim();
     const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    // 0. CHECK ADMIN COLLECTION FIRST (IF ROLE IS ADMIN OR IDENTIFIER MATCHES ADMIN)
-    if (selectedRole === 'admin' || cleanInput.toLowerCase() === 'admin' || cleanInput.toLowerCase().includes('admin')) {
-      let admin = await Admin.findOne({
+    // 1. ADMIN ROLE (Explicitly requested or username matches 'admin')
+    if (selectedRole === 'admin' || cleanInput.toLowerCase() === 'admin') {
+      const admin = await Admin.findOne({
         $or: [
           { username: cleanInput.toLowerCase() },
           { email: cleanInput.toLowerCase() },
@@ -243,46 +248,43 @@ export const loginUser = async (req, res) => {
         ]
       }).select('+password');
 
-      if (admin) {
-        let isMatch = await admin.matchPassword(cleanPassword);
-        if (!isMatch && cleanPassword === 'admin123') {
-          admin.password = cleanPassword;
-          await admin.save();
-          isMatch = true;
-        }
-
-        if (isMatch) {
-          admin.lastLogin = new Date();
-          await admin.save();
-          const token = generateToken(admin._id, admin.email);
-          console.log(`[MongoDB Admin Auth Success]: Authenticated admin "${admin.username}" (${admin.email}) from admins collection`);
-
-          return res.status(200).json({
-            success: true,
-            message: 'Admin login successful!',
-            token,
-            user: {
-              _id: admin._id,
-              username: admin.username,
-              name: admin.fullName || admin.username,
-              fullName: admin.fullName || admin.username,
-              email: admin.email,
-              role: 'admin',
-              createdAt: admin.createdAt
-            }
-          });
-        }
-      }
-      
-      if (selectedRole === 'admin') {
+      if (!admin) {
         return res.status(401).json({
           success: false,
-          message: 'Invalid username/email or password for admin account'
+          message: 'Invalid username/email or password'
         });
       }
+
+      const isMatch = await admin.matchPassword(cleanPassword);
+      if (!isMatch) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid username/email or password'
+        });
+      }
+
+      admin.lastLogin = new Date();
+      await admin.save();
+      const token = generateToken(admin._id, admin.email);
+      console.log(`[Admin Auth Success]: Authenticated admin "${admin.username}" (${admin.email})`);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Admin login successful!',
+        token,
+        user: {
+          _id: admin._id,
+          username: admin.username,
+          name: admin.fullName || admin.username,
+          fullName: admin.fullName || admin.username,
+          email: admin.email,
+          role: 'admin',
+          createdAt: admin.createdAt
+        }
+      });
     }
 
-    // 1. IF RECRUITER ROLE IS SELECTED -> Authenticate exclusively from recruiters table
+    // 2. RECRUITER ROLE
     if (selectedRole === 'recruiter') {
       let recruiter = await Recruiter.findOne({
         $or: [
@@ -292,7 +294,7 @@ export const loginUser = async (req, res) => {
         ]
       }).select('+password');
 
-      // Fallback: If recruiter was registered previously in users table, migrate to recruiters table
+      // Legacy check: account in users table must have valid password before migrating
       if (!recruiter) {
         const userRec = await User.findOne({
           email: cleanInput.toLowerCase(),
@@ -300,6 +302,13 @@ export const loginUser = async (req, res) => {
         }).select('+password');
 
         if (userRec) {
+          const isMatchLegacy = await userRec.matchPassword(cleanPassword);
+          if (!isMatchLegacy) {
+            return res.status(401).json({
+              success: false,
+              message: 'Invalid email or password'
+            });
+          }
           recruiter = await Recruiter.create({
             fullName: userRec.fullName || userRec.name,
             email: userRec.email,
@@ -307,14 +316,14 @@ export const loginUser = async (req, res) => {
             role: 'recruiter'
           });
           await User.findByIdAndDelete(userRec._id);
-          console.log(`[Migrated Recruiter]: Moved "${userRec.email}" from users table to recruiters table.`);
+          console.log(`[Migrated Recruiter]: Moved authenticated recruiter "${userRec.email}" to recruiters table.`);
         }
       }
 
       if (!recruiter) {
         return res.status(401).json({
           success: false,
-          message: 'Invalid email or password for recruiter account'
+          message: 'Invalid email or password'
         });
       }
 
@@ -325,15 +334,16 @@ export const loginUser = async (req, res) => {
         });
       }
 
-      let isMatch = await recruiter.matchPassword(cleanPassword);
-      if (!isMatch) {
-        recruiter.password = cleanPassword;
-        await recruiter.save();
-        isMatch = true;
+      const isMatchRecruiter = await recruiter.matchPassword(cleanPassword);
+      if (!isMatchRecruiter) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid email or password'
+        });
       }
 
       const token = generateToken(recruiter._id, recruiter.email);
-      console.log(`[MongoDB Recruiter Auth Success]: Authenticated recruiter "${recruiter.fullName}" (${recruiter.email}) from recruiters table`);
+      console.log(`[Recruiter Auth Success]: Authenticated recruiter "${recruiter.fullName}" (${recruiter.email})`);
 
       return res.status(200).json({
         success: true,
@@ -350,7 +360,7 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    // 2. IF MENTOR ROLE IS SELECTED -> Authenticate exclusively from mentors collection
+    // 3. MENTOR ROLE
     if (selectedRole === 'mentor') {
       let mentor = await Mentor.findOne({
         $or: [
@@ -360,7 +370,7 @@ export const loginUser = async (req, res) => {
         ]
       }).select('+password');
 
-      // Fallback: If mentor was registered previously in users table, migrate to mentors collection
+      // Legacy check: account in users table must have valid password before migrating
       if (!mentor) {
         const userMen = await User.findOne({
           email: cleanInput.toLowerCase(),
@@ -368,6 +378,13 @@ export const loginUser = async (req, res) => {
         }).select('+password');
 
         if (userMen) {
+          const isMatchLegacy = await userMen.matchPassword(cleanPassword);
+          if (!isMatchLegacy) {
+            return res.status(401).json({
+              success: false,
+              message: 'Invalid email or password'
+            });
+          }
           mentor = await Mentor.create({
             fullName: userMen.fullName || userMen.name,
             email: userMen.email,
@@ -375,14 +392,14 @@ export const loginUser = async (req, res) => {
             role: 'mentor'
           });
           await User.findByIdAndDelete(userMen._id);
-          console.log(`[Migrated Mentor]: Moved "${userMen.email}" from users table to mentors collection.`);
+          console.log(`[Migrated Mentor]: Moved authenticated mentor "${userMen.email}" to mentors collection.`);
         }
       }
 
       if (!mentor) {
         return res.status(401).json({
           success: false,
-          message: 'Invalid email or password for mentor account'
+          message: 'Invalid email or password'
         });
       }
 
@@ -393,15 +410,16 @@ export const loginUser = async (req, res) => {
         });
       }
 
-      let isMatch = await mentor.matchPassword(cleanPassword);
-      if (!isMatch) {
-        mentor.password = cleanPassword;
-        await mentor.save();
-        isMatch = true;
+      const isMatchMentor = await mentor.matchPassword(cleanPassword);
+      if (!isMatchMentor) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid email or password'
+        });
       }
 
       const token = generateToken(mentor._id, mentor.email);
-      console.log(`[MongoDB Mentor Auth Success]: Authenticated mentor "${mentor.fullName}" (${mentor.email}) from mentors collection`);
+      console.log(`[Mentor Auth Success]: Authenticated mentor "${mentor.fullName}" (${mentor.email})`);
 
       return res.status(200).json({
         success: true,
@@ -418,28 +436,120 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    // Fallback Admin check if role was not explicitly specified
-    let adminDoc = await Admin.findOne({
+    // 4. STUDENT ROLE OR UNQUALIFIED ROLE
+    // Check Student in users collection
+    let user = await User.findOne({
       $or: [
-        { username: cleanInput.toLowerCase() },
-        { email: cleanInput.toLowerCase() }
+        { email: cleanInput.toLowerCase() },
+        { email: new RegExp('^' + escapeRegex(cleanInput) + '$', 'i') },
+        { fullName: new RegExp('^' + escapeRegex(cleanInput) + '$', 'i') }
       ]
     }).select('+password');
 
-    if (adminDoc) {
-      let isMatch = await adminDoc.matchPassword(cleanPassword);
-      if (!isMatch && cleanPassword === 'admin123') {
-        adminDoc.password = cleanPassword;
-        await adminDoc.save();
-        isMatch = true;
+    if (user) {
+      if (user.isActive === false) {
+        return res.status(403).json({
+          success: false,
+          message: 'Your account has been deactivated by administrator. Please contact support.'
+        });
       }
 
-      if (isMatch) {
+      const isMatch = await user.matchPassword(cleanPassword);
+      if (!isMatch) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid email or password'
+        });
+      }
+
+      const token = generateToken(user._id, user.email);
+      console.log(`[Student Auth Success]: Authenticated student "${user.fullName || user.name}" (${user.email})`);
+
+      const displayName = user.fullName || user.name;
+      return res.status(200).json({
+        success: true,
+        message: 'Login successful!',
+        token,
+        user: {
+          _id: user._id,
+          name: displayName,
+          fullName: displayName,
+          email: user.email,
+          role: user.role || 'student',
+          createdAt: user.createdAt
+        }
+      });
+    }
+
+    // If role was not explicitly specified, check fallback collections
+    if (!selectedRole) {
+      // Fallback Recruiter
+      const rec = await Recruiter.findOne({ email: cleanInput.toLowerCase() }).select('+password');
+      if (rec) {
+        if (rec.isActive === false) {
+          return res.status(403).json({ success: false, message: 'Your account has been deactivated.' });
+        }
+        const isMatchRec = await rec.matchPassword(cleanPassword);
+        if (!isMatchRec) {
+          return res.status(401).json({ success: false, message: 'Invalid email or password' });
+        }
+        const token = generateToken(rec._id, rec.email);
+        return res.status(200).json({
+          success: true,
+          message: 'Recruiter login successful!',
+          token,
+          user: {
+            _id: rec._id,
+            name: rec.fullName,
+            fullName: rec.fullName,
+            email: rec.email,
+            role: 'recruiter',
+            createdAt: rec.createdAt
+          }
+        });
+      }
+
+      // Fallback Mentor
+      const men = await Mentor.findOne({ email: cleanInput.toLowerCase() }).select('+password');
+      if (men) {
+        if (men.isActive === false) {
+          return res.status(403).json({ success: false, message: 'Your account has been deactivated.' });
+        }
+        const isMatchMen = await men.matchPassword(cleanPassword);
+        if (!isMatchMen) {
+          return res.status(401).json({ success: false, message: 'Invalid email or password' });
+        }
+        const token = generateToken(men._id, men.email);
+        return res.status(200).json({
+          success: true,
+          message: 'Mentor login successful!',
+          token,
+          user: {
+            _id: men._id,
+            name: men.fullName,
+            fullName: men.fullName,
+            email: men.email,
+            role: 'mentor',
+            createdAt: men.createdAt
+          }
+        });
+      }
+
+      // Fallback Admin
+      const adminDoc = await Admin.findOne({
+        $or: [
+          { username: cleanInput.toLowerCase() },
+          { email: cleanInput.toLowerCase() }
+        ]
+      }).select('+password');
+      if (adminDoc) {
+        const isMatchAdmin = await adminDoc.matchPassword(cleanPassword);
+        if (!isMatchAdmin) {
+          return res.status(401).json({ success: false, message: 'Invalid email or password' });
+        }
         adminDoc.lastLogin = new Date();
         await adminDoc.save();
         const token = generateToken(adminDoc._id, adminDoc.email);
-        console.log(`[MongoDB Admin Auth Success]: Authenticated admin "${adminDoc.username}" (${adminDoc.email}) from admins collection`);
-
         return res.status(200).json({
           success: true,
           message: 'Admin login successful!',
@@ -457,119 +567,91 @@ export const loginUser = async (req, res) => {
       }
     }
 
-    // 2. IF STUDENT ROLE IS SELECTED (OR DEFAULT) -> Authenticate exclusively from users table
-    let user = await User.findOne({
-      $or: [
-        { email: cleanInput.toLowerCase() },
-        { email: new RegExp('^' + escapeRegex(cleanInput) + '$', 'i') },
-        { fullName: new RegExp('^' + escapeRegex(cleanInput) + '$', 'i') },
-      ]
-    }).select('+password');
-
-    if (!user) {
-      user = await User.findOne({
-        $or: [
-          { email: { $regex: escapeRegex(cleanInput), $options: 'i' } },
-          { fullName: { $regex: escapeRegex(cleanInput), $options: 'i' } }
-        ]
-      }).select('+password');
-    }
-
-    // Fallback check in recruiters table
-    if (!user) {
-      const rec = await Recruiter.findOne({ email: cleanInput.toLowerCase() }).select('+password');
-      if (rec) {
-        let isMatch = await rec.matchPassword(cleanPassword);
-        if (!isMatch) {
-          rec.password = cleanPassword;
-          await rec.save();
-        }
-        const token = generateToken(rec._id, rec.email);
-        return res.status(200).json({
-          success: true,
-          message: 'Recruiter login successful!',
-          token,
-          user: {
-            _id: rec._id,
-            name: rec.fullName,
-            fullName: rec.fullName,
-            email: rec.email,
-            role: 'recruiter',
-            createdAt: rec.createdAt
-          }
-        });
-      }
-    }
-
-    // Fallback check in mentors collection
-    if (!user) {
-      const men = await Mentor.findOne({ email: cleanInput.toLowerCase() }).select('+password');
-      if (men) {
-        let isMatch = await men.matchPassword(cleanPassword);
-        if (!isMatch) {
-          men.password = cleanPassword;
-          await men.save();
-        }
-        const token = generateToken(men._id, men.email);
-        return res.status(200).json({
-          success: true,
-          message: 'Mentor login successful!',
-          token,
-          user: {
-            _id: men._id,
-            name: men.fullName,
-            fullName: men.fullName,
-            email: men.email,
-            role: 'mentor',
-            createdAt: men.createdAt
-          }
-        });
-      }
-    }
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid email or password'
-      });
-    }
-
-    if (user.isActive === false) {
-      return res.status(403).json({
-        success: false,
-        message: 'Your account has been deactivated by administrator. Please contact support.'
-      });
-    }
-
-    let isMatch = await user.matchPassword(cleanPassword);
-    if (!isMatch) {
-      user.password = cleanPassword;
-      await user.save();
-      isMatch = true;
-    }
-
-    const token = generateToken(user._id, user.email);
-    console.log(`[MongoDB Student Auth Success]: Authenticated user "${user.fullName || user.name}" (${user.email}) from users table`);
-
-    const displayName = user.fullName || user.name;
-    return res.status(200).json({
-      success: true,
-      message: 'Login successful!',
-      token,
-      user: {
-        _id: user._id,
-        name: displayName,
-        fullName: displayName,
-        email: user.email,
-        role: user.role,
-        createdAt: user.createdAt
-      }
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid email or password'
     });
   } catch (error) {
     console.error('Login Controller Error:', error);
     return res.status(500).json({
       success: false,
       message: error.message || 'Server error during login'
+    });
+  }
+};
+
+// @desc    Change password for authenticated user (dedicated authenticated process)
+// @route   PUT /api/auth/password
+// @access  Private (Authenticated)
+export const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword, confirmNewPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide both current password and new password'
+      });
+    }
+
+    if (confirmNewPassword && newPassword !== confirmNewPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password and confirm password do not match'
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 6 characters long'
+      });
+    }
+
+    const userId = req.user._id;
+    const role = req.user.role;
+
+    let account = null;
+    if (role === 'admin') {
+      account = await Admin.findById(userId).select('+password');
+    } else if (role === 'recruiter') {
+      account = await Recruiter.findById(userId).select('+password');
+    } else if (role === 'mentor') {
+      account = await Mentor.findById(userId).select('+password');
+    } else {
+      account = await User.findById(userId).select('+password');
+    }
+
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        message: 'User account not found'
+      });
+    }
+
+    const isMatch = await account.matchPassword(currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Current password is incorrect'
+      });
+    }
+
+    // Save triggers pre-save bcrypt hashing hook
+    account.password = newPassword;
+    await account.save();
+
+    console.log(`[Password Changed]: Successfully updated password for user "${account.email || account.username}" (${role})`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password updated successfully'
+    });
+  } catch (error) {
+    console.error('[Change Password Error]:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to update password'
     });
   }
 };
@@ -665,6 +747,7 @@ export const googleVerify = async (req, res) => {
     }
 
     // Verify the Google ID token
+    const googleClient = getGoogleClient();
     const ticket = await googleClient.verifyIdToken({
       idToken: credential,
       audience: process.env.GOOGLE_CLIENT_ID,

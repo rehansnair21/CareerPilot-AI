@@ -12,11 +12,12 @@ export const protect = async (req, res, next) => {
     req.headers.authorization.startsWith('Bearer')
   ) {
     try {
+      if (!process.env.JWT_SECRET) {
+        console.error('[Auth Middleware Error]: JWT_SECRET environment variable is not configured.');
+        return res.status(500).json({ success: false, message: 'Server security configuration error' });
+      }
       token = req.headers.authorization.split(' ')[1];
-      const decoded = jwt.verify(
-        token,
-        process.env.JWT_SECRET || 'career_pilot_super_secret_jwt_key_2026_blue_white_auth'
-      );
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
       let user = null;
 

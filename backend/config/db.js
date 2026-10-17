@@ -1,61 +1,27 @@
 import mongoose from 'mongoose';
-import dns from 'dns';
 import { seedDefaultUsers } from './seed.js';
 
-// Safe DNS setup for MongoDB Atlas SRV resolution
-try {
-  dns.setServers(['8.8.8.8', '1.1.1.1']);
-} catch (e) {
-  // Ignore DNS set errors
-}
-
 const connectDB = async () => {
-  const atlasSrvUri = process.env.MONGODB_URI;
-  const localUri = 'mongodb://127.0.0.1:27017/careerpilot_ai';
+  const uri = process.env.MONGODB_URI;
 
-  const urisToTry = [
-    { name: 'MongoDB Cloud Atlas (MONGODB_URI)', uri: atlasSrvUri },
-    { name: 'Local MongoDB (127.0.0.1:27017)', uri: localUri },
-  ].filter((item) => Boolean(item.uri));
-
-  for (const { name, uri } of urisToTry) {
-    try {
-      const options = {
-        serverSelectionTimeoutMS: 3000,
-      };
-      // Only attach TLS options if connecting to mongodb+srv or ssl URI
-      if (uri.includes('mongodb+srv://') || uri.includes('ssl=true') || uri.includes('tls=true')) {
-        options.tls = true;
-        options.tlsAllowInvalidCertificates = true;
-      }
-      const conn = await mongoose.connect(uri, options);
-      console.log(`[MongoDB Connected Successfully] via ${name}`);
-      console.log(`Connected Database Name: ${conn.connection.name}`);
-      console.log(`Connected Host: ${conn.connection.host}`);
-      await seedDefaultUsers();
-      return conn;
-    } catch (err) {
-      console.warn(`[MongoDB Notice]: Connection via ${name} bypassed: ${err.message || 'Unavailable'}`);
-    }
+  if (!uri) {
+    console.error('[MongoDB FATAL]: MONGODB_URI environment variable is not set. Production requires a valid MongoDB Atlas connection string.');
+    process.exit(1);
   }
 
-  // Fallback: Start MongoMemoryServer so registration & login always work 100% seamlessly offline
   try {
-    console.log('[MongoDB Notice]: Primary database connection unavailable. Starting in-memory MongoDB fallback server...');
-    const { MongoMemoryServer } = await import('mongodb-memory-server');
-    const mongoServer = await MongoMemoryServer.create();
-    const memoryUri = mongoServer.getUri();
-    const conn = await mongoose.connect(memoryUri);
-    console.log(`[MongoDB Connected Successfully] via MongoMemoryServer (In-Memory Fallback)`);
-    console.log(`Connected Host: ${conn.connection.host}`);
+    // Connect directly to MongoDB Atlas using standard TLS certificate validation.
+    // Strict TLS validation is enforced; invalid certificates and insecure fallbacks are prohibited.
+    const conn = await mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 10000,
+    });
+    console.log(`[MongoDB Connected]: ${conn.connection.host} — database: ${conn.connection.name}`);
     await seedDefaultUsers();
     return conn;
-  } catch (memErr) {
-    console.error('[MongoDB Critical Error]: Failed to start in-memory MongoDB server:', memErr.message);
+  } catch (err) {
+    console.error(`[MongoDB FATAL]: Could not connect to MongoDB Atlas: ${err.message}`);
+    process.exit(1);
   }
 };
 
 export default connectDB;
-
-
-
