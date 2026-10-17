@@ -66,25 +66,19 @@ const GoogleSignInButton = ({ onSuccess, onError, role }) => {
           onError('Google Sign-In was cancelled or failed. Please try again.');
         }
       },
+      use_fedcm_for_prompt: true, // Opt in to FedCM to comply with Chrome and Edge
       auto_select: false,
       cancel_on_tap_outside: true,
     });
 
-    // Use prompt() to show the Google One Tap / account chooser
+    // Use prompt() with FedCM to show Google One Tap / account chooser
     window.google.accounts.id.prompt((notification) => {
-      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-        // Fallback: render a hidden button and click it
-        setLoading(false);
-        if (btnRef.current) {
-          window.google.accounts.id.renderButton(btnRef.current, {
-            type: 'standard',
-            theme: 'outline',
-            size: 'large',
-            text: 'signin_with',
-            shape: 'rectangular',
-          });
-          const hiddenBtn = btnRef.current.querySelector('div[role="button"]');
-          if (hiddenBtn) hiddenBtn.click();
+      setLoading(false);
+      // Modern FedCM status inspection (avoids deprecated isNotDisplayed / isSkippedMoment)
+      if (typeof notification.getMomentType === 'function') {
+        const moment = notification.getMomentType();
+        if (moment === 'dismissed' || moment === 'skipped') {
+          console.warn('[Google Auth]: One Tap prompt dismissed or skipped.');
         }
       }
     });
