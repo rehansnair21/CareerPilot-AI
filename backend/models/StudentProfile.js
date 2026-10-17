@@ -43,16 +43,47 @@ const studentProfileSchema = new mongoose.Schema(
     assessmentsCompleted: { type: Number, default: 0 },
     careerMatch: { type: Number, default: null },
     careerMatchTitle: { type: String, default: '' },
+    careerMatchSkills: [{ type: String }],
     learningProgress: { type: Number, default: 0 },
     completedModules: { type: Number, default: 0 },
     totalModules: { type: Number, default: 0 },
     projectsCompleted: { type: Number, default: 0 },
+
+    // Detailed Career Recommendations
+    careerRecommendations: {
+      generatedAt: { type: Date, default: null },
+      recommendations: [
+        {
+          careerTitle: { type: String, required: true },
+          matchPercentage: { type: Number, required: true },
+          matchingSkills: [{ type: String }],
+          skillGaps: [{ type: String }],
+          reason: { type: String, default: '' },
+          recommendedImprovements: [{ type: String }],
+        },
+      ],
+    },
+
+    // Selected Active Personalized Roadmap for Authenticated Student
+    selectedRoadmap: {
+      careerTitle: { type: String, default: '' },
+      matchPercentage: { type: Number, default: 0 },
+      matchingSkills: [{ type: String }],
+      skillGaps: [{ type: String }],
+      phases: { type: mongoose.Schema.Types.Mixed },
+      recommendedResources: { type: mongoose.Schema.Types.Mixed },
+      milestonesList: { type: mongoose.Schema.Types.Mixed },
+      aiTip: { type: String, default: '' },
+      updatedAt: { type: Date, default: null },
+    },
 
     // Detailed Resume Analysis
     resumeAnalysis: {
       analyzedAt: { type: Date, default: null },
       fileName: { type: String, default: '' },
       fileSize: { type: String, default: '' },
+      fileBuffer: { type: Buffer, default: null },
+      fileMimeType: { type: String, default: 'application/pdf' },
       targetRole: { type: String, default: '' },
       atsScore: { type: Number, default: 0 },
       atsCompatibility: { type: String, default: '' },
@@ -75,6 +106,24 @@ const studentProfileSchema = new mongoose.Schema(
           reason: { type: String },
         },
       ],
+    },
+
+    // Detailed Portfolio Analysis
+    portfolioAnalysis: {
+      analyzedAt: { type: Date, default: null },
+      portfolioUrl: { type: String, default: '' },
+      overallScore: { type: Number, default: 0 },
+      overallReview: { type: String, default: '' },
+      ratingBreakdown: {
+        designAndUx: { type: Number, default: 0 },
+        projectShowcase: { type: Number, default: 0 },
+        technicalDepth: { type: Number, default: 0 },
+        contentClarity: { type: Number, default: 0 },
+      },
+      strengths: [{ type: String }],
+      weaknesses: [{ type: String }],
+      recommendations: [{ type: String }],
+      detectedSkills: [{ type: String }],
     },
 
     // Student Activity Log

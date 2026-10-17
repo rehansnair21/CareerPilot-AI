@@ -9,8 +9,6 @@ import {
   Briefcase,
   FileText,
   Users,
-  Bell,
-  Settings,
   LogOut,
   X,
   ChevronRight,
@@ -33,11 +31,6 @@ export const RecruiterSidebar = ({ mobileOpen, setMobileOpen, onOpenNotification
     { name: 'My Jobs', path: '/recruiter/jobs', icon: Briefcase },
     { name: 'Applications', path: '/recruiter/applications', icon: FileText },
     { name: 'Candidates', path: '/recruiter/candidates', icon: Users },
-  ];
-
-  const accountItems = [
-    { name: 'Notifications', onClick: onOpenNotifications, icon: Bell, badge: '3' },
-    { name: 'Settings', onClick: onOpenSettings, icon: Settings },
   ];
 
   const getInitials = (name) => {
@@ -111,35 +104,7 @@ export const RecruiterSidebar = ({ mobileOpen, setMobileOpen, onOpenNotification
           })}
         </div>
 
-        {/* Account Section */}
-        <div className="space-y-1.5 pt-2 border-t border-[#9FB2AC]/60">
-          <span className="px-3 text-[10px] font-extrabold uppercase text-[#5A6C66] tracking-wider block mb-2">
-            Account & System
-          </span>
-          {accountItems.map((item, idx) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={idx}
-                onClick={() => {
-                  if (item.onClick) item.onClick();
-                  if (setMobileOpen) setMobileOpen(false);
-                }}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-extrabold text-xs text-[#5A6C66] hover:bg-[#FFF9EB]/60 hover:text-[#5D0D1A] transition-all group"
-              >
-                <div className="flex items-center gap-3">
-                  <Icon size={18} className="transition-transform group-hover:scale-110" />
-                  <span>{item.name}</span>
-                </div>
-                {item.badge && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#5D0D1A] text-[#FFF9EB]">
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+
       </div>
 
       {/* Recruiter Footer Profile Card */}

@@ -39,6 +39,7 @@ export const ResumeAnalysis = ({ onAnalysisComplete }) => {
   const [pastedText, setPastedText] = useState('');
 
   const [analyzing, setAnalyzing] = useState(false);
+  const [isReanalyzing, setIsReanalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [analysisStep, setAnalysisStep] = useState('');
   const [error, setError] = useState(null);
@@ -85,14 +86,24 @@ export const ResumeAnalysis = ({ onAnalysisComplete }) => {
     }
   };
 
-  const handleRemoveFile = () => {
-    setFile(null);
-    setPastedText('');
-    setAnalysis(null);
-    setError(null);
-    setSyncSuccess('');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+  const handleRemoveFile = async () => {
+    try {
+      await api.delete('/student/resume');
+    } catch (err) {
+      console.warn('Error deleting resume analysis from server:', err);
+    } finally {
+      setFile(null);
+      setPastedText('');
+      setAnalysis(null);
+      setError(null);
+      setSyncSuccess('');
+      setIsReanalyzing(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      if (onAnalysisComplete) {
+        onAnalysisComplete(0);
+      }
     }
   };
 
@@ -142,8 +153,10 @@ export const ResumeAnalysis = ({ onAnalysisComplete }) => {
     return true;
   };
 
-  const handleAnalyze = async (overrideFile = null) => {
+  const handleAnalyze = async (overrideFile = null, isReanalyze = false) => {
     const fileToUse = overrideFile || file;
+    const reanalyzeFlag = isReanalyze && !overrideFile;
+    setIsReanalyzing(reanalyzeFlag);
     setError(null);
     setSyncSuccess('');
 
@@ -160,7 +173,7 @@ export const ResumeAnalysis = ({ onAnalysisComplete }) => {
 
     setAnalyzing(true);
     setAnalysisProgress(15);
-    setAnalysisStep('Extracting resume structure & section headers...');
+    setAnalysisStep(reanalyzeFlag ? 'Re-analyzing existing resume...' : 'Extracting resume structure & section headers...');
 
     const progressTimer1 = setTimeout(() => {
       setAnalysisProgress(45);
@@ -277,7 +290,8 @@ export const ResumeAnalysis = ({ onAnalysisComplete }) => {
   const standing = getStandingInfo(overallScore);
   const StandingIcon = standing.Icon;
 
-  const hasLoadedFile = Boolean(file || (analysis && (analysis.fileName || analysis.atsScore)));
+  const hasPriorAnalysis = Boolean(analysis && (analysis.fileName || analysis.atsScore || analysis.analyzedAt));
+  const hasLoadedFile = Boolean(file || hasPriorAnalysis);
   const currentFileName = file ? file.name : (analysis?.fileName || 'Uploaded Resume Document');
   const currentFileSize = file ? `${(file.size / 1024).toFixed(1)} KB` : (analysis?.fileSize || 'Saved from profile');
 
@@ -401,10 +415,10 @@ export const ResumeAnalysis = ({ onAnalysisComplete }) => {
                 onDragOver={handleDrag}
                 onDrop={handleDrop}
                 className={`border-2 border-dashed rounded-[20px] p-8 md:p-10 text-center transition-all flex flex-col items-center justify-center min-h-[220px] ${dragActive
-                    ? 'border-[#5D0D1A] bg-[#FFF9EB]'
-                    : hasLoadedFile
-                      ? 'border-emerald-400 bg-emerald-50/40'
-                      : 'border-[#9FB2AC] bg-white hover:border-[#5D0D1A] hover:bg-[#FFF9EB]/50'
+                  ? 'border-[#5D0D1A] bg-[#FFF9EB]'
+                  : hasLoadedFile
+                    ? 'border-emerald-400 bg-emerald-50/40'
+                    : 'border-[#9FB2AC] bg-white hover:border-[#5D0D1A] hover:bg-[#FFF9EB]/50'
                   }`}
               >
                 <input
@@ -440,21 +454,28 @@ export const ResumeAnalysis = ({ onAnalysisComplete }) => {
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={analyzing}
-                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#5D0D1A] via-[#7A1424] to-[#420912] hover:from-[#420912] hover:to-[#5D0D1A] text-[#FFF9EB] font-extrabold text-sm shadow-md shadow-[#5D0D1A]/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    className={`px-6 py-3 rounded-xl bg-gradient-to-r from-[#5D0D1A] via-[#7A1424] to-[#420912] text-[#FFF9EB] font-extrabold text-sm shadow-md shadow-[#5D0D1A]/20 transition-all ${analyzing
+                      ? 'opacity-100 brightness-110 shadow-lg'
+                      : 'hover:from-[#420912] hover:to-[#5D0D1A] hover:scale-[1.02] active:scale-[0.98]'
+                      }`}
                   >
-                    {analyzing ? 'Analyzing Resume...' : hasLoadedFile ? 'Change File' : 'Browse Files'}
+                    {hasLoadedFile ? 'Change File' : 'Browse Files'}
                   </button>
 
-                  {hasLoadedFile && (
+                  {(hasLoadedFile || analyzing) && (
                     <>
                       <button
                         type="button"
-                        onClick={() => handleAnalyze()}
+                        onClick={() => handleAnalyze(null, true)}
                         disabled={analyzing}
-                        className="px-6 py-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-extrabold text-sm transition-all shadow-md shadow-emerald-700/20 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className={`px-6 py-3 rounded-xl font-extrabold text-sm transition-all flex items-center gap-2 ${
+                          analyzing
+                            ? 'bg-emerald-700 text-white opacity-80 border border-emerald-500/40 cursor-not-allowed shadow-xs'
+                            : 'bg-emerald-700 hover:bg-emerald-800 text-white opacity-100 shadow-md shadow-emerald-700/20'
+                        }`}
                       >
                         <RefreshCw size={15} className={`shrink-0 ${analyzing ? 'animate-spin' : ''}`} />
-                        <span>{analyzing ? 'Analyzing...' : 'Re-analyze'}</span>
+                        <span>{analyzing ? (isReanalyzing ? 'Re-analyzing Resume...' : 'Analyzing Resume...') : 'Re-analyze'}</span>
                       </button>
 
                       <button
@@ -464,7 +485,11 @@ export const ResumeAnalysis = ({ onAnalysisComplete }) => {
                           handleRemoveFile();
                         }}
                         disabled={analyzing}
-                        className="px-6 py-3 bg-red-50 hover:bg-red-100 text-red-700 font-extrabold text-sm rounded-xl transition-all border border-red-200 flex items-center gap-2 shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
+                        className={`px-6 py-3 font-extrabold text-sm rounded-xl transition-all border flex items-center gap-2 ${
+                          analyzing
+                            ? 'bg-red-100 text-red-900 border-red-300 opacity-100 shadow-sm'
+                            : 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200 opacity-100 shadow-2xs'
+                        }`}
                       >
                         <Trash2 size={15} className="shrink-0" />
                         <span>Remove File</span>
@@ -487,10 +512,14 @@ export const ResumeAnalysis = ({ onAnalysisComplete }) => {
                     type="button"
                     onClick={() => handleAnalyze()}
                     disabled={analyzing || !pastedText.trim()}
-                    className="px-6 py-2.5 bg-gradient-to-r from-[#5D0D1A] to-[#7A1424] text-[#FFF9EB] font-extrabold text-xs rounded-xl shadow-md shadow-[#5D0D1A]/20 transition-all hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className={`px-6 py-2.5 font-extrabold text-xs rounded-xl flex items-center gap-2 transition-all ${
+                      analyzing
+                        ? 'bg-gradient-to-r from-[#5D0D1A] to-[#7A1424] text-[#FFF9EB] opacity-80 border border-[#FFF9EB]/30 cursor-not-allowed shadow-xs'
+                        : 'bg-gradient-to-r from-[#5D0D1A] to-[#7A1424] text-[#FFF9EB] opacity-100 shadow-md shadow-[#5D0D1A]/20 hover:opacity-95'
+                    }`}
                   >
                     {analyzing && <RefreshCw size={14} className="animate-spin shrink-0" />}
-                    <span>{analyzing ? 'Analyzing Text...' : 'Analyze Pasted Resume'}</span>
+                    <span>{analyzing ? (isReanalyzing ? 'Re-analyzing Resume...' : 'Analyzing Text...') : 'Analyze Pasted Resume'}</span>
                   </button>
 
                   {(pastedText || analysis) && (
@@ -498,7 +527,10 @@ export const ResumeAnalysis = ({ onAnalysisComplete }) => {
                       type="button"
                       onClick={handleRemoveFile}
                       disabled={analyzing}
-                      className="px-5 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 font-extrabold text-xs rounded-xl border border-red-200 flex items-center gap-1.5"
+                      className={`px-5 py-2.5 font-extrabold text-xs rounded-xl border flex items-center gap-1.5 transition-all ${analyzing
+                        ? 'bg-red-100 text-red-900 border-red-300 opacity-100 shadow-sm'
+                        : 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200 opacity-100'
+                        }`}
                     >
                       <Trash2 size={14} />
                       <span>Clear Text & Reset</span>

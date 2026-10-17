@@ -12,6 +12,8 @@ import {
   updateJob,
   deleteJob,
   getApplications,
+  getStudentProfileForRecruiter,
+  downloadCandidateResume,
   updateApplicationStatus,
   deleteApplication,
   getCandidates,
@@ -43,6 +45,8 @@ router.delete('/jobs/:id', deleteJob);
 
 // Application Pipeline Management
 router.get('/applications', getApplications);
+router.get('/applications/:id/student-profile', getStudentProfileForRecruiter);
+router.get('/applications/:id/download-resume', downloadCandidateResume);
 router.put('/applications/:id/status', updateApplicationStatus);
 router.delete('/applications/:id', deleteApplication);
 

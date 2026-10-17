@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Building2, Briefcase, CheckCircle2, Clock, Trash2, ShieldCheck, AlertCircle } from 'lucide-react';
 
-export const AdminRecruiterManagement = ({ usersList = [], jobsList = [], onDeleteUser }) => {
+export const AdminRecruiterManagement = ({ usersList = [], jobsList = [], onDeleteUser, onToggleUserStatus }) => {
   const [search, setSearch] = useState('');
 
   const recruiters = usersList.filter((u) => u.role === 'recruiter' || u.collectionName === 'recruiters').filter((r) => {
@@ -96,18 +96,38 @@ export const AdminRecruiterManagement = ({ usersList = [], jobsList = [], onDele
                       </span>
                     </td>
                     <td className="py-3.5 px-5">
-                      <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active Partner
-                      </span>
+                      {r.isActive !== false ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-red-600 bg-red-50 px-2.5 py-0.5 rounded-full border border-red-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500" /> Deactivated
+                        </span>
+                      )}
                     </td>
                     <td className="py-3.5 px-5 text-center">
-                      <button
-                        onClick={() => onDeleteUser && onDeleteUser(r)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 text-[11px] font-extrabold transition-all"
-                        title="Delete recruiter account"
-                      >
-                        <Trash2 size={13} /> Delete
-                      </button>
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => onToggleUserStatus && onToggleUserStatus(r)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all border ${
+                            r.isActive !== false
+                              ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200'
+                              : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200'
+                          }`}
+                          title={r.isActive !== false ? 'Deactivate recruiter login' : 'Activate recruiter login'}
+                        >
+                          {r.isActive !== false ? 'Deactivate' : 'Activate'}
+                        </button>
+
+                        <button
+                          onClick={() => onDeleteUser && onDeleteUser(r)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 text-[11px] font-extrabold transition-all"
+                          title="Delete recruiter account"
+                        >
+                          <Trash2 size={13} /> Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -74,6 +74,24 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Google Sign-In action (receives credential from Google GSI)
+  const loginWithGoogle = async (credential, role = 'student') => {
+    try {
+      const res = await api.post('/auth/google/verify', { credential, role });
+
+      if (res.data && res.data.success) {
+        localStorage.setItem('career_pilot_token', res.data.token);
+        setUser(res.data.user);
+        return { success: true, message: res.data.message };
+      }
+      return { success: false, message: res.data?.message || 'Google sign-in failed' };
+    } catch (error) {
+      console.error('Google Sign-In error:', error);
+      const message = error.response?.data?.message || error.message || 'Google sign-in failed';
+      return { success: false, message };
+    }
+  };
+
   // Logout action
   const logout = () => {
     localStorage.removeItem('career_pilot_token');
@@ -87,6 +105,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         register,
         login,
+        loginWithGoogle,
         logout,
       }}
     >

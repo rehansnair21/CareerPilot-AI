@@ -10,8 +10,17 @@ import { CareerGoalCard } from '../../components/dashboard/CareerGoalCard';
 import { QuickActions } from '../../components/dashboard/QuickActions';
 import { RecentActivity } from '../../components/dashboard/RecentActivity';
 import { ResumeAnalysis } from '../../components/dashboard/ResumeAnalysis';
+import { PortfolioAnalysis } from '../../components/dashboard/PortfolioAnalysis';
 import { StudentJobs } from '../../components/dashboard/StudentJobs';
-import { Sparkles, ArrowLeft, Construction, AlertCircle, RefreshCw } from 'lucide-react';
+import { CodingAssessment } from '../../components/dashboard/CodingAssessment';
+import { SoftSkillAssessment } from '../../components/dashboard/SoftSkillAssessment';
+import { CareerRecommendations } from '../../components/dashboard/CareerRecommendations';
+import { PersonalizedRoadmap } from '../../components/dashboard/PersonalizedRoadmap';
+import { StudentCourses } from '../../components/dashboard/StudentCourses';
+import { StudentMessages } from '../../components/dashboard/StudentMessages';
+import { StudentMentorInterventionsCard } from '../../components/dashboard/StudentMentorInterventionsCard';
+import { Sparkles, ArrowLeft, Construction, AlertCircle, RefreshCw, Code, Brain } from 'lucide-react';
+
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const StudentDashboard = () => {
@@ -20,13 +29,25 @@ export const StudentDashboard = () => {
   const location = useLocation();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'dashboard');
+  const [selectedRoadmapCareer, setSelectedRoadmapCareer] = useState(location.state?.career || null);
+
+  const [selectedEnrollmentCourseId, setSelectedEnrollmentCourseId] = useState(location.state?.openCourseId || null);
 
   // Sync activeTab if location state changes
   useEffect(() => {
     if (location.state?.activeTab) {
       setActiveTab(location.state.activeTab);
     }
+    if (location.state?.openCourseId) {
+      setSelectedEnrollmentCourseId(location.state.openCourseId);
+    }
   }, [location]);
+
+  // Reset transient roadmap selection state on user session change
+  useEffect(() => {
+    setSelectedRoadmapCareer(null);
+    setSelectedEnrollmentCourseId(null);
+  }, [user?._id]);
 
   // Dynamic database-driven dashboard state
   const [dashboardData, setDashboardData] = useState(null);
@@ -60,10 +81,32 @@ export const StudentDashboard = () => {
     }
   }, [user, fetchDashboardStats]);
 
-  const handleNavigateTab = (tab) => {
+  useEffect(() => {
+    const handleStatsUpdate = () => {
+      fetchDashboardStats();
+    };
+    window.addEventListener('careerpilot:stats-updated', handleStatsUpdate);
+    return () => {
+      window.removeEventListener('careerpilot:stats-updated', handleStatsUpdate);
+    };
+  }, [fetchDashboardStats]);
+
+  useEffect(() => {
+    if (activeTab === 'dashboard' && user && user.role === 'student') {
+      fetchDashboardStats();
+    }
+  }, [activeTab, user, fetchDashboardStats]);
+
+  const handleNavigateTab = (tab, extraState) => {
     if (tab === 'profile') {
       navigate('/student/profile');
     } else {
+      if (tab === 'roadmap' && extraState?.career) {
+        setSelectedRoadmapCareer(extraState.career);
+      }
+      if (tab === 'courses' && extraState?.openCourseId) {
+        setSelectedEnrollmentCourseId(extraState.openCourseId);
+      }
       setActiveTab(tab);
     }
   };
@@ -87,12 +130,14 @@ export const StudentDashboard = () => {
 
   const moduleNames = {
     profile: 'Student Profile',
+    courses: 'Courses & Learning',
     assessments: 'Skill Assessments',
     resume: 'Resume Analysis',
     portfolio: 'Portfolio Analysis',
     recommendations: 'Career Recommendations',
     roadmap: 'Personalized Roadmap',
     jobs: 'Jobs & Internships',
+    messages: 'Mentor Messages',
     notifications: 'Notifications',
     settings: 'Account Settings',
   };
@@ -171,6 +216,9 @@ export const StudentDashboard = () => {
                     {/* 1. Welcome Hero Feature */}
                     <WelcomeCard data={dashboardData} onNavigate={handleNavigateTab} />
 
+                    {/* Mentor Guidance & Intervention Check-In */}
+                    <StudentMentorInterventionsCard onNavigate={handleNavigateTab} />
+
                     {/* 2. Statistics Overview */}
                     <section id="overview">
                       <StatsCards data={dashboardData} />
@@ -193,15 +241,86 @@ export const StudentDashboard = () => {
                   </>
                 )}
               </motion.div>
+            ) : (activeTab === 'assessments' || activeTab === 'assessments-technical' || activeTab === 'assessments-soft') ? (
+              <motion.div key={activeTab} {...pageTransition} className="space-y-6">
+                {/* Assessment Sub-Buttons Navigation Bar */}
+                <div className="bg-white rounded-[22px] p-2 border border-[#9FB2AC] shadow-xs flex items-center gap-2 max-w-md">
+                  <button
+                    onClick={() => setActiveTab('assessments-technical')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-extrabold transition-all ${
+                      activeTab === 'assessments' || activeTab === 'assessments-technical'
+                        ? 'bg-[#5D0D1A] text-[#FFF9EB] shadow-md shadow-[#5D0D1A]/10'
+                        : 'bg-transparent text-[#5A6C66] hover:text-[#5D0D1A] hover:bg-[#FFF9EB]'
+                    }`}
+                  >
+                    <Code size={16} />
+                    <span>Technical Assessment</span>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('assessments-soft')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-extrabold transition-all ${
+                      activeTab === 'assessments-soft'
+                        ? 'bg-[#5D0D1A] text-[#FFF9EB] shadow-md shadow-[#5D0D1A]/10'
+                        : 'bg-transparent text-[#5A6C66] hover:text-[#5D0D1A] hover:bg-[#FFF9EB]'
+                    }`}
+                  >
+                    <Brain size={16} />
+                    <span>Soft Skill Assessment</span>
+                  </button>
+                </div>
+
+                {/* Sub-Assessment Content */}
+                {activeTab === 'assessments-soft' ? (
+                  <SoftSkillAssessment onAssessmentComplete={fetchDashboardStats} />
+                ) : (
+                  <CodingAssessment onAssessmentComplete={fetchDashboardStats} />
+                )}
+              </motion.div>
             ) : activeTab === 'resume' ? (
               <motion.div key="resume" {...pageTransition}>
                 <ResumeAnalysis onAnalysisComplete={fetchDashboardStats} />
+              </motion.div>
+            ) : activeTab === 'portfolio' ? (
+              <motion.div key="portfolio" {...pageTransition}>
+                <PortfolioAnalysis onAnalysisComplete={fetchDashboardStats} />
               </motion.div>
             ) : activeTab === 'jobs' ? (
               <motion.div key="jobs" {...pageTransition}>
                 <StudentJobs />
               </motion.div>
+            ) : activeTab === 'recommendations' ? (
+              <motion.div key="recommendations" {...pageTransition}>
+                <CareerRecommendations
+                  onNavigate={handleNavigateTab}
+                  onSelectRoadmapCareer={(career) => {
+                    setSelectedRoadmapCareer(career);
+                    setActiveTab('roadmap');
+                  }}
+                />
+              </motion.div>
+            ) : activeTab === 'roadmap' ? (
+              <motion.div key="roadmap" {...pageTransition}>
+                <PersonalizedRoadmap
+                  selectedCareer={selectedRoadmapCareer}
+                  onNavigate={handleNavigateTab}
+                />
+              </motion.div>
+            ) : activeTab === 'courses' ? (
+              <motion.div key="courses" {...pageTransition}>
+                <StudentCourses initialOpenCourseId={selectedEnrollmentCourseId} />
+              </motion.div>
+            ) : activeTab === 'messages' || activeTab === 'notifications' ? (
+              <motion.div key="messages" {...pageTransition}>
+                <StudentMessages
+                  onNavigateToCourse={(courseId) => {
+                    setSelectedEnrollmentCourseId(courseId);
+                    setActiveTab('courses');
+                  }}
+                />
+              </motion.div>
             ) : (
+
               /* Module Placeholder for Non-Dashboard Links */
 
               <motion.div

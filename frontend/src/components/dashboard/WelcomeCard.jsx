@@ -62,10 +62,10 @@ export const WelcomeCard = ({ data, onNavigate }) => {
           {/* Action Buttons */}
           <div className="pt-2 flex flex-wrap items-center gap-3.5">
             <button
-              onClick={() => onNavigate && onNavigate('roadmap')}
+              onClick={() => onNavigate && onNavigate(data?.hasCareerMatch ? 'roadmap' : 'recommendations')}
               className="inline-flex items-center gap-2 px-6 h-[50px] rounded-2xl bg-[#FFF9EB] text-[#5D0D1A] hover:bg-[#F7EED8] text-sm font-extrabold shadow-lg shadow-[#420912]/40 transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
-              <span>Continue Your Journey</span>
+              <span>{data?.hasCareerMatch ? 'Continue Your Journey' : 'Get Career Recommendations'}</span>
               <ArrowRight size={16} />
             </button>
 

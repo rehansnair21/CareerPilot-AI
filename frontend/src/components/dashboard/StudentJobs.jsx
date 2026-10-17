@@ -18,7 +18,8 @@ import {
   Send,
   Layers,
   GraduationCap,
-  Download
+  Download,
+  User
 } from 'lucide-react';
 
 export const StudentJobs = () => {
@@ -30,12 +31,28 @@ export const StudentJobs = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('All');
 
-  // Selected Job Modal State
+  // Selected Job Modal State (Job Details)
   const [selectedJob, setSelectedJob] = useState(null);
+
+  // Apply Modal State (Apply for Position Form)
+  const [applyJobModal, setApplyJobModal] = useState(null);
   const [applying, setApplying] = useState(false);
   const [applySuccessMsg, setApplySuccessMsg] = useState('');
   const [applyErrorMsg, setApplyErrorMsg] = useState('');
-  const [coverNote, setCoverNote] = useState('');
+
+  // Application Form Fields
+  const [formFullName, setFormFullName] = useState('');
+  const [formEmail, setFormEmail] = useState('');
+  const [formPhone, setFormPhone] = useState('');
+  const [formDegree, setFormDegree] = useState('');
+  const [formInstitution, setFormInstitution] = useState('');
+  const [formGraduationYear, setFormGraduationYear] = useState('');
+  const [formSkills, setFormSkills] = useState('');
+  const [formExpType, setFormExpType] = useState('Fresher'); // 'Fresher' | 'Experienced'
+  const [formExpDetails, setFormExpDetails] = useState('');
+  const [formResumeFile, setFormResumeFile] = useState(null);
+  const [existingResumeName, setExistingResumeName] = useState('');
+  const [formCoverNote, setFormCoverNote] = useState('');
 
   useEffect(() => {
     fetchStudentJobs();
@@ -93,41 +110,116 @@ export const StudentJobs = () => {
     }
   };
 
-  const handleApply = async (jobId) => {
+  const openApplyModal = async (job) => {
+    setApplySuccessMsg('');
+    setApplyErrorMsg('');
+    setFormResumeFile(null);
+    setFormCoverNote('');
+    setApplyJobModal(job);
+
+    try {
+      const res = await api.get('/student/profile');
+      if (res.data && res.data.success) {
+        const u = res.data.data.user || {};
+        const p = res.data.data.profile || {};
+
+        setFormFullName(u.name || u.fullName || '');
+        setFormEmail(u.email || '');
+        setFormPhone(p.phone || '');
+        setFormDegree(p.degree || '');
+        setFormInstitution(p.college || '');
+        setFormGraduationYear(p.graduationYear ? String(p.graduationYear) : '');
+        
+        const skillsArray = p.technicalSkills || [];
+        setFormSkills(skillsArray.join(', '));
+
+        setExistingResumeName(p.resumeAnalysis?.fileName || '');
+
+        if (p.experienceYears && p.experienceYears > 0) {
+          setFormExpType('Experienced');
+          setFormExpDetails(`${p.experienceYears} years experience`);
+        } else {
+          setFormExpType('Fresher');
+          setFormExpDetails('');
+        }
+      }
+    } catch (err) {
+      console.warn('Could not auto-fetch student profile:', err);
+    }
+  };
+
+  const handleSubmitApplication = async (e) => {
+    e.preventDefault();
+    if (!applyJobModal) return;
+
+    if (!formSkills || !formSkills.trim()) {
+      setApplyErrorMsg('Skills field is required to submit application.');
+      return;
+    }
+
+    if (formExpType === 'Experienced' && !formExpDetails.trim()) {
+      setApplyErrorMsg('Please specify your experience details.');
+      return;
+    }
+
+    const cleanPhoneDigits = (formPhone || '').replace(/\D/g, '');
+    if (!cleanPhoneDigits) {
+      setApplyErrorMsg('Phone number is required to submit application.');
+      return;
+    }
+    if (!/^[6-9]/.test(cleanPhoneDigits)) {
+      setApplyErrorMsg('Phone number must start with 6, 7, 8, or 9.');
+      return;
+    }
+    if (cleanPhoneDigits.length !== 10) {
+      setApplyErrorMsg(`Phone number must contain exactly 10 digits (currently ${cleanPhoneDigits.length}).`);
+      return;
+    }
+
     setApplying(true);
     setApplySuccessMsg('');
     setApplyErrorMsg('');
 
     try {
-      const res = await api.post('/student/jobs/apply', {
-        jobId,
-        coverNote,
+      const formData = new FormData();
+      formData.append('jobId', applyJobModal._id);
+      formData.append('fullName', formFullName);
+      formData.append('email', formEmail);
+      formData.append('phone', formPhone);
+      formData.append('degree', formDegree);
+      formData.append('institution', formInstitution);
+      formData.append('graduationYear', formGraduationYear);
+      formData.append('skills', formSkills);
+      formData.append('experienceType', formExpType);
+      formData.append('experienceDetails', formExpType === 'Fresher' ? 'Fresher' : formExpDetails);
+      formData.append('coverNote', formCoverNote);
+
+      if (formResumeFile) {
+        formData.append('resume', formResumeFile);
+      }
+
+      const res = await api.post('/student/jobs/apply', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
 
       if (res.data && res.data.success) {
         setApplySuccessMsg(res.data.message || 'Application submitted successfully!');
-        
-        // Update local jobs state to mark as applied
         setJobs((prevJobs) =>
           prevJobs.map((j) =>
-            j._id === jobId ? { ...j, hasApplied: true, applicationsCount: (j.applicationsCount || 0) + 1 } : j
+            j._id === applyJobModal._id ? { ...j, hasApplied: true, applicationsCount: (j.applicationsCount || 0) + 1 } : j
           )
         );
-
-        if (selectedJob && selectedJob._id === jobId) {
-          setSelectedJob((prev) => ({ ...prev, hasApplied: true }));
-        }
-
         setTimeout(() => {
-          setSelectedJob(null);
-          setCoverNote('');
-          setApplySuccessMsg('');
+          setApplyJobModal(null);
         }, 1800);
       } else {
         setApplyErrorMsg(res.data?.message || 'Failed to submit application.');
       }
     } catch (err) {
-      setApplyErrorMsg(err.response?.data?.message || 'Server error submitting application.');
+      console.error('Error submitting application:', err);
+      setApplyErrorMsg(err.response?.data?.message || 'Failed to submit job application.');
     } finally {
       setApplying(false);
     }
@@ -354,18 +446,21 @@ export const StudentJobs = () => {
 
               {/* Card Footer: Action Buttons */}
               <div className="pt-3 border-t border-[#9FB2AC]/40 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={() => setSelectedJob(job)}
-                    className="text-xs font-extrabold text-[#5D0D1A] hover:underline flex items-center gap-1"
+                    className="px-3.5 py-1.5 rounded-xl bg-[#FFF9EB] hover:bg-[#F7EED8] text-[#5D0D1A] border border-[#9FB2AC] text-xs font-extrabold flex items-center gap-1.5 shadow-2xs transition-all hover:scale-[1.02]"
+                    title="View complete job details in pop-up window"
                   >
-                    <FileText size={13} />
-                    <span>View Details</span>
+                    <FileText size={13} className="text-[#5D0D1A]" />
+                    <span>Job Details</span>
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => handleDownloadJd(job)}
-                    className="text-xs font-extrabold text-[#7A1424] hover:underline flex items-center gap-1"
+                    className="px-3 py-1.5 rounded-xl bg-white hover:bg-[#FFF9EB] text-[#7A1424] border border-[#9FB2AC]/70 text-xs font-extrabold flex items-center gap-1.5 transition-all"
                     title="Download official JD document"
                   >
                     <Download size={13} />
@@ -374,16 +469,52 @@ export const StudentJobs = () => {
                 </div>
 
                 {job.hasApplied ? (
-                  <button
-                    disabled
-                    className="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-extrabold flex items-center gap-1.5 cursor-default"
-                  >
-                    <CheckCircle2 size={14} className="text-emerald-600" />
-                    <span>Applied</span>
-                  </button>
+                  job.applicationStatus === 'Shortlisted' ? (
+                    <button
+                      disabled
+                      className="px-4 py-2 rounded-xl bg-amber-50 text-amber-900 border border-amber-300 text-xs font-extrabold flex items-center gap-1.5 cursor-default shadow-xs"
+                      title="You have been shortlisted by the recruiter!"
+                    >
+                      <Sparkles size={14} className="text-amber-600" />
+                      <span>Shortlisted</span>
+                    </button>
+                  ) : job.applicationStatus === 'Interview' ? (
+                    <button
+                      disabled
+                      className="px-4 py-2 rounded-xl bg-indigo-50 text-indigo-900 border border-indigo-300 text-xs font-extrabold flex items-center gap-1.5 cursor-default shadow-xs"
+                    >
+                      <Calendar size={14} className="text-indigo-600" />
+                      <span>Interview Round</span>
+                    </button>
+                  ) : job.applicationStatus === 'Selected' ? (
+                    <button
+                      disabled
+                      className="px-4 py-2 rounded-xl bg-emerald-100 text-emerald-900 border border-emerald-400 text-xs font-extrabold flex items-center gap-1.5 cursor-default shadow-xs"
+                    >
+                      <CheckCircle2 size={14} className="text-emerald-700" />
+                      <span>Selected</span>
+                    </button>
+                  ) : job.applicationStatus === 'Rejected' ? (
+                    <button
+                      disabled
+                      className="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 border border-gray-300 text-xs font-bold flex items-center gap-1.5 cursor-default"
+                    >
+                      <X size={14} className="text-gray-500" />
+                      <span>Not Selected</span>
+                    </button>
+                  ) : (
+                    <button
+                      disabled
+                      className="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-extrabold flex items-center gap-1.5 cursor-default"
+                    >
+                      <CheckCircle2 size={14} className="text-emerald-600" />
+                      <span>Applied</span>
+                    </button>
+                  )
                 ) : (
                   <button
-                    onClick={() => setSelectedJob(job)}
+                    type="button"
+                    onClick={() => openApplyModal(job)}
                     className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#5D0D1A] via-[#7A1424] to-[#420912] hover:from-[#420912] hover:to-[#5D0D1A] text-[#FFF9EB] text-xs font-extrabold shadow-2xs transition-all hover:scale-[1.02]"
                   >
                     Apply Now
@@ -523,48 +654,286 @@ export const StudentJobs = () => {
               </div>
             </div>
 
-            {/* Optional Cover Note */}
-            {!selectedJob.hasApplied && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-extrabold text-[#5D0D1A]">Add an Optional Note to Recruiter</label>
-                <textarea
-                  rows={3}
-                  placeholder="Introduce yourself or highlight why you're a great fit for this position..."
-                  value={coverNote}
-                  onChange={(e) => setCoverNote(e.target.value)}
-                  className="w-full bg-[#FFF9EB]/60 border border-[#9FB2AC] rounded-xl p-3 text-xs font-semibold text-[#2D060D] focus:outline-none focus:ring-2 focus:ring-[#5D0D1A]/30"
-                />
-              </div>
-            )}
-
             {/* Modal Footer Actions */}
-            <div className="pt-2 border-t border-[#9FB2AC]/50 flex items-center justify-end gap-3">
+            <div className="pt-3 border-t border-[#9FB2AC]/50 flex items-center justify-end">
               <button
+                type="button"
                 onClick={() => setSelectedJob(null)}
-                className="px-5 py-2.5 rounded-xl border border-[#9FB2AC] text-[#5A6C66] text-xs font-extrabold hover:bg-[#FFF9EB]"
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#5D0D1A] to-[#7A1424] text-[#FFF9EB] text-xs font-extrabold shadow-2xs hover:opacity-95 transition-all"
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-              {selectedJob.hasApplied ? (
+      {/* JOB APPLICATION POP-UP MODAL */}
+      {applyJobModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-[28px] max-w-2xl w-full border border-[#9FB2AC] shadow-2xl p-6 md:p-8 space-y-6 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-4 border-b border-[#9FB2AC]/50 pb-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#5D0D1A] to-[#7A1424] text-[#FFF9EB] font-black text-base flex items-center justify-center shadow-xs shrink-0">
+                  {getCompanyInitials(applyJobModal.companyName)}
+                </div>
+                <div>
+                  <span className="text-[11px] font-extrabold text-[#7A1424] block uppercase tracking-wider">
+                    Application Form • {applyJobModal.companyName}
+                  </span>
+                  <h2 className="text-xl font-extrabold text-[#5D0D1A]">
+                    Apply for {applyJobModal.title}
+                  </h2>
+                  <p className="text-xs text-[#5A6C66] font-semibold pt-0.5">
+                    {applyJobModal.location || 'Remote'} • {applyJobModal.employmentType || 'Full-time'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setApplyJobModal(null)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-[#5A6C66] transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Alert Messages */}
+            {applySuccessMsg && (
+              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                <span>{applySuccessMsg}</span>
+              </div>
+            )}
+
+            {applyErrorMsg && (
+              <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold flex items-center gap-2">
+                <AlertCircle size={16} className="shrink-0" />
+                <span>{applyErrorMsg}</span>
+              </div>
+            )}
+
+            {/* Application Form */}
+            <form onSubmit={handleSubmitApplication} className="space-y-5 text-xs">
+              {/* Section 1: Contact Details (Editable, Pre-filled from profile) */}
+              <div className="p-4 rounded-2xl bg-[#FFF9EB]/80 border border-[#9FB2AC]/70 space-y-3">
+                <h4 className="text-xs font-extrabold text-[#5D0D1A] uppercase tracking-wider flex items-center gap-1.5">
+                  <User size={14} /> Personal & Contact Details
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[#5D0D1A] font-extrabold mb-1">
+                      Full Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formFullName}
+                      onChange={(e) => setFormFullName(e.target.value)}
+                      placeholder="Enter your full name"
+                      className="w-full bg-white border border-[#9FB2AC] rounded-xl px-3 py-2 text-xs font-bold text-[#5D0D1A] focus:outline-none focus:ring-2 focus:ring-[#5D0D1A]/30 shadow-2xs"
+                    />
+                    <span className="text-[10px] text-[#5A6C66] font-semibold block pt-0.5">Pre-filled from profile (Editable)</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[#5A6C66] font-extrabold mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      readOnly
+                      value={formEmail}
+                      className="w-full bg-white/80 border border-[#9FB2AC]/60 rounded-xl px-3 py-2 text-xs font-bold text-[#5D0D1A] cursor-not-allowed shadow-2xs"
+                    />
+                    <span className="text-[10px] text-emerald-700 font-bold block pt-0.5">✓ Account Email</span>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-[#5D0D1A] font-extrabold mb-1">
+                      Phone Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      maxLength={15}
+                      placeholder="e.g. +91 9876543210"
+                      value={formPhone}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const cleanDigits = val.replace(/[^0-9+ ]/g, '');
+                        setFormPhone(cleanDigits);
+                      }}
+                      className="w-full bg-white border border-[#9FB2AC] rounded-xl px-3 py-2 text-xs font-bold text-[#5D0D1A] focus:outline-none focus:ring-2 focus:ring-[#5D0D1A]/30 shadow-2xs"
+                    />
+                    <span className="text-[10px] text-[#5A6C66] font-semibold block pt-0.5">Must be 10 digits starting with 6-9 (Pre-filled from profile)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Resume File Upload (Manual Upload) */}
+              <div className="p-4 rounded-2xl bg-white border border-[#9FB2AC]/70 space-y-3 shadow-2xs">
+                <h4 className="text-xs font-extrabold text-[#5D0D1A] uppercase tracking-wider flex items-center justify-between">
+                  <span className="flex items-center gap-1.5"><FileText size={14} /> Resume File</span>
+                  <span className="text-[10px] text-[#5A6C66] font-extrabold bg-[#FFF9EB] px-2 py-0.5 rounded-md border border-[#9FB2AC]">Manual Upload</span>
+                </h4>
+                <div>
+                  <label className="block text-[#5D0D1A] font-extrabold mb-1.5">
+                    Upload Resume File from Computer (PDF / DOCX / TXT)
+                  </label>
+                  <input
+                    type="file"
+                    accept=".pdf,.docx,.doc,.txt"
+                    onChange={(e) => setFormResumeFile(e.target.files[0] || null)}
+                    className="w-full text-xs text-[#5A6C66] file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-[#5D0D1A] file:text-[#FFF9EB] hover:file:bg-[#7A1424] cursor-pointer bg-[#FFF9EB]/50 p-2 border border-[#9FB2AC] rounded-xl"
+                  />
+                  {formResumeFile ? (
+                    <span className="text-[11px] font-extrabold text-emerald-700 block pt-1.5">
+                      ✓ Selected File to Upload: {formResumeFile.name} ({(formResumeFile.size / 1024).toFixed(1)} KB)
+                    </span>
+                  ) : existingResumeName ? (
+                    <span className="text-[11px] font-bold text-[#5A6C66] block pt-1.5">
+                      📄 Currently Attached Profile Resume: {existingResumeName} (Select file above to upload a new version)
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* Section 3: Education */}
+              <div className="p-4 rounded-2xl bg-[#FFF9EB]/80 border border-[#9FB2AC]/70 space-y-3">
+                <h4 className="text-xs font-extrabold text-[#5D0D1A] uppercase tracking-wider flex items-center gap-1.5">
+                  <GraduationCap size={14} /> Education Details
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[#5D0D1A] font-extrabold mb-1">Degree</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. B.Tech Computer Science"
+                      value={formDegree}
+                      onChange={(e) => setFormDegree(e.target.value)}
+                      className="w-full bg-white border border-[#9FB2AC] rounded-xl px-3 py-2 text-xs font-semibold text-[#2D060D] focus:outline-none focus:ring-2 focus:ring-[#5D0D1A]/30"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[#5D0D1A] font-extrabold mb-1">Institution / College</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Cochin University"
+                      value={formInstitution}
+                      onChange={(e) => setFormInstitution(e.target.value)}
+                      className="w-full bg-white border border-[#9FB2AC] rounded-xl px-3 py-2 text-xs font-semibold text-[#2D060D] focus:outline-none focus:ring-2 focus:ring-[#5D0D1A]/30"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[#5D0D1A] font-extrabold mb-1">Graduation Year</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 2026"
+                      value={formGraduationYear}
+                      onChange={(e) => setFormGraduationYear(e.target.value)}
+                      className="w-full bg-white border border-[#9FB2AC] rounded-xl px-3 py-2 text-xs font-semibold text-[#2D060D] focus:outline-none focus:ring-2 focus:ring-[#5D0D1A]/30"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 4: Skills (Required) */}
+              <div className="p-4 rounded-2xl bg-white border border-[#9FB2AC]/70 space-y-2 shadow-2xs">
+                <label className="block text-xs font-extrabold text-[#5D0D1A] uppercase tracking-wider flex items-center justify-between">
+                  <span className="flex items-center gap-1.5"><Layers size={14} /> Skills <span className="text-red-500">*</span></span>
+                  <span className="text-[10px] text-red-500 font-extrabold">Required</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Python, React, Node.js, C++, Data Analysis"
+                  value={formSkills}
+                  onChange={(e) => setFormSkills(e.target.value)}
+                  className="w-full bg-[#FFF9EB]/60 border border-[#9FB2AC] rounded-xl p-3 text-xs font-bold text-[#5D0D1A] focus:outline-none focus:ring-2 focus:ring-[#5D0D1A]/30"
+                />
+                <p className="text-[10px] text-[#5A6C66] font-semibold">Separate multiple skills with commas.</p>
+              </div>
+
+              {/* Section 5: Experience */}
+              <div className="p-4 rounded-2xl bg-[#FFF9EB]/80 border border-[#9FB2AC]/70 space-y-3">
+                <h4 className="text-xs font-extrabold text-[#5D0D1A] uppercase tracking-wider flex items-center gap-1.5">
+                  <Briefcase size={14} /> Experience Status
+                </h4>
+                <div className="flex items-center gap-4">
+                  <label className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-extrabold cursor-pointer transition-all ${
+                    formExpType === 'Fresher'
+                      ? 'bg-[#5D0D1A] text-[#FFF9EB] border-[#5D0D1A] shadow-2xs'
+                      : 'bg-white text-[#5A6C66] border-[#9FB2AC] hover:bg-[#FFF9EB]'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="expType"
+                      value="Fresher"
+                      checked={formExpType === 'Fresher'}
+                      onChange={() => setFormExpType('Fresher')}
+                      className="hidden"
+                    />
+                    <span>Fresher</span>
+                  </label>
+
+                  <label className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-extrabold cursor-pointer transition-all ${
+                    formExpType === 'Experienced'
+                      ? 'bg-[#5D0D1A] text-[#FFF9EB] border-[#5D0D1A] shadow-2xs'
+                      : 'bg-white text-[#5A6C66] border-[#9FB2AC] hover:bg-[#FFF9EB]'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="expType"
+                      value="Experienced"
+                      checked={formExpType === 'Experienced'}
+                      onChange={() => setFormExpType('Experienced')}
+                      className="hidden"
+                    />
+                    <span>Experienced</span>
+                  </label>
+                </div>
+
+                {formExpType === 'Experienced' ? (
+                  <div className="space-y-1">
+                    <label className="block text-[#5D0D1A] font-extrabold">Experience Details</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Specify your years of experience, current role, or past internships..."
+                      value={formExpDetails}
+                      onChange={(e) => setFormExpDetails(e.target.value)}
+                      className="w-full bg-white border border-[#9FB2AC] rounded-xl p-3 text-xs font-semibold text-[#2D060D] focus:outline-none focus:ring-2 focus:ring-[#5D0D1A]/30"
+                    />
+                  </div>
+                ) : (
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800 flex items-center gap-2">
+                    <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                    <span>Applying as a Fresher (Entry Level)</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="pt-3 border-t border-[#9FB2AC]/50 flex items-center justify-end gap-3">
                 <button
-                  disabled
-                  className="px-6 py-2.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-extrabold flex items-center gap-2 cursor-default"
+                  type="button"
+                  onClick={() => setApplyJobModal(null)}
+                  className="px-5 py-2.5 rounded-xl border border-[#9FB2AC] text-[#5A6C66] text-xs font-extrabold hover:bg-[#FFF9EB]"
                 >
-                  <CheckCircle2 size={16} className="text-emerald-600" />
-                  <span>Application Submitted</span>
+                  Cancel
                 </button>
-              ) : (
+
                 <button
-                  onClick={() => handleApply(selectedJob._id)}
+                  type="submit"
                   disabled={applying}
                   className="px-8 py-2.5 rounded-xl bg-gradient-to-r from-[#5D0D1A] via-[#7A1424] to-[#420912] hover:from-[#420912] hover:to-[#5D0D1A] text-[#FFF9EB] text-xs font-extrabold shadow-md shadow-[#5D0D1A]/20 transition-all hover:scale-[1.02] disabled:opacity-50 flex items-center gap-2"
                 >
                   <Send size={15} />
                   <span>{applying ? 'Submitting Application...' : 'Submit Application'}</span>
                 </button>
-              )}
-            </div>
+              </div>
+            </form>
           </div>
         </div>
       )}

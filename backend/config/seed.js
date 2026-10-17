@@ -1,6 +1,7 @@
 import User from '../models/User.js';
 import StudentProfile from '../models/StudentProfile.js';
 import Recruiter from '../models/Recruiter.js';
+import Mentor from '../models/Mentor.js';
 
 export const seedDefaultUsers = async () => {
   try {
@@ -32,6 +33,22 @@ export const seedDefaultUsers = async () => {
     ];
 
     for (const acc of demoAccounts) {
+      if (acc.role === 'mentor') {
+        let mentorExists = await Mentor.findOne({ email: acc.email.toLowerCase() });
+        if (!mentorExists) {
+          await Mentor.create({
+            fullName: acc.fullName,
+            email: acc.email.toLowerCase(),
+            password: acc.password,
+            role: 'mentor',
+            company: 'Tech Career Mentors',
+            designation: 'Senior Staff Mentor'
+          });
+          console.log(`[Seed DB]: Pre-seeded mentor document in "mentors" collection for "${acc.email}"`);
+        }
+        continue;
+      }
+
       let user = await User.findOne({ email: acc.email.toLowerCase() });
       if (!user) {
         user = await User.create(acc);

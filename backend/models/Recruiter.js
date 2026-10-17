@@ -78,6 +78,14 @@ const recruiterSchema = new mongoose.Schema(
       enum: ['pending', 'verified', 'rejected'],
       default: 'verified',
     },
+    googleId: {
+      type: String,
+      default: null,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
   },
   {
     timestamps: true,

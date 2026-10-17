@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, GraduationCap, FileText, CheckCircle2, Clock, Trash2, AlertCircle } from 'lucide-react';
 
-export const AdminStudentManagement = ({ usersList = [], onDeleteUser }) => {
+export const AdminStudentManagement = ({ usersList = [], onDeleteUser, onToggleUserStatus }) => {
   const [search, setSearch] = useState('');
 
   const students = usersList.filter(
@@ -103,18 +103,38 @@ export const AdminStudentManagement = ({ usersList = [], onDeleteUser }) => {
                       </span>
                     </td>
                     <td className="py-3.5 px-5">
-                      <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active
-                      </span>
+                      {st.isActive !== false ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-red-600 bg-red-50 px-2.5 py-0.5 rounded-full border border-red-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500" /> Deactivated
+                        </span>
+                      )}
                     </td>
                     <td className="py-3.5 px-5 text-center">
-                      <button
-                        onClick={() => onDeleteUser && onDeleteUser(st)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 text-[11px] font-extrabold transition-all"
-                        title="Delete student account"
-                      >
-                        <Trash2 size={13} /> Delete
-                      </button>
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => onToggleUserStatus && onToggleUserStatus(st)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all border ${
+                            st.isActive !== false
+                              ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200'
+                              : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200'
+                          }`}
+                          title={st.isActive !== false ? 'Deactivate student login' : 'Activate student login'}
+                        >
+                          {st.isActive !== false ? 'Deactivate' : 'Activate'}
+                        </button>
+
+                        <button
+                          onClick={() => onDeleteUser && onDeleteUser(st)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 text-[11px] font-extrabold transition-all"
+                          title="Delete student account"
+                        >
+                          <Trash2 size={13} /> Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

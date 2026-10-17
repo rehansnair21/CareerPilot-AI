@@ -27,14 +27,9 @@ export const AdminSidebar = ({ isOpen, onClose, activeTab = 'overview', setActiv
 
   const mainModules = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'courses', label: 'Course Management', icon: GraduationCap },
     { id: 'users', label: 'User Management', icon: Users },
-    { id: 'students', label: 'Student Management', icon: GraduationCap },
-    { id: 'recruiters', label: 'Recruiter Management', icon: Building2 },
     { id: 'jobs', label: 'Job Management', icon: Briefcase },
-    { id: 'applications', label: 'Application Management', icon: Layers },
-    { id: 'resume-ai', label: 'Resume & AI Analysis', icon: Sparkles },
-    { id: 'assessments', label: 'Assessments', icon: CheckSquare },
-    { id: 'analytics', label: 'Reports & Analytics', icon: TrendingUp },
   ];
 
   const secondaryModules = [

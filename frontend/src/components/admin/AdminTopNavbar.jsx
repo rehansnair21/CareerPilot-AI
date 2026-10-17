@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Search, Bell, ChevronDown, User, Settings, LogOut, Database } from 'lucide-react';
+import { Menu, Search, Bell, ChevronDown, User, Settings, LogOut } from 'lucide-react';
 
 export const AdminTopNavbar = ({
   onOpenMobileSidebar,
@@ -31,15 +31,10 @@ export const AdminTopNavbar = ({
   };
 
   const titles = {
-    overview: 'Overview & Analytics',
+    overview: 'Overview & Dashboard',
+    courses: 'Course Management',
     users: 'User Management',
-    students: 'Student Accounts',
-    recruiters: 'Recruiter Companies',
     jobs: 'Job Postings Management',
-    applications: 'Candidate Applications',
-    'resume-ai': 'Resume & AI Analysis',
-    assessments: 'Skill Assessments Control',
-    analytics: 'Reports & Analytics',
     notifications: 'Admin Notifications',
     settings: 'System Configuration',
     profile: 'Admin Profile Settings',
@@ -61,9 +56,6 @@ export const AdminTopNavbar = ({
           <h1 className="text-base sm:text-lg font-extrabold text-[#5D0D1A] tracking-tight whitespace-nowrap">
             {titles[activeTab] || 'Admin Dashboard'}
           </h1>
-          <span className="hidden xl:inline-flex items-center gap-1 text-[11px] font-bold bg-[#FFF9EB] text-[#5D0D1A] px-2.5 py-0.5 rounded-full border border-[#9FB2AC] whitespace-nowrap shrink-0">
-            <Database size={11} /> MongoDB Active
-          </span>
         </div>
 
         {/* Global Search */}

@@ -91,6 +91,14 @@ const parsePhoneNumber = (phoneStr = '') => {
     }
   }
 
+  if (/^91[6-9]\d{9}$/.test(trimmed)) {
+    return { countryCode: '+91', number: trimmed.slice(2) };
+  }
+
+  if (/^0[6-9]\d{9}$/.test(trimmed)) {
+    return { countryCode: '+91', number: trimmed.slice(1) };
+  }
+
   return { countryCode: '+91', number: trimmed };
 };
 
@@ -217,9 +225,19 @@ export const StudentProfilePage = () => {
 
     switch (name) {
       case 'phone': {
-        const phoneRegex = /^\+?[0-9\s\-()]{7,15}$/;
-        if (!phoneRegex.test(strVal)) {
-          return 'Enter a valid phone number (7 to 15 digits)';
+        const parsed = parsePhoneNumber(strVal);
+        const rawNum = (parsed.number || '').trim();
+
+        if (!rawNum) return null; // Empty phone number allowed until typed
+
+        if (/[^0-9]/.test(rawNum)) {
+          return 'Phone number cannot contain letters or special characters';
+        }
+        if (!/^[6-9]/.test(rawNum)) {
+          return 'Phone number must start with 6, 7, 8, or 9';
+        }
+        if (rawNum.length !== 10) {
+          return `Phone number must contain exactly 10 digits (currently ${rawNum.length})`;
         }
         break;
       }
@@ -961,14 +979,24 @@ export const StudentProfilePage = () => {
                         <input
                           type="text"
                           name="phone"
+                          maxLength={16}
                           value={parsePhoneNumber(profileData.phone).number}
                           onChange={(e) => {
-                            const newNumber = e.target.value.replace(/[^0-9\s\-()]/g, '');
-                            const { countryCode } = parsePhoneNumber(profileData.phone);
-                            const newFull = newNumber ? `${countryCode} ${newNumber}` : '';
+                            const rawVal = e.target.value;
+                            const parsedPasted = parsePhoneNumber(rawVal);
+                            let targetCode = parsePhoneNumber(profileData.phone).countryCode;
+                            let cleanDigits = rawVal.replace(/[^0-9]/g, '');
+
+                            if (rawVal.startsWith('+') || rawVal.includes(' ') || cleanDigits.length > 10) {
+                              targetCode = parsedPasted.countryCode;
+                              cleanDigits = (parsedPasted.number || '').replace(/[^0-9]/g, '');
+                            }
+
+                            cleanDigits = cleanDigits.slice(0, 10);
+                            const newFull = cleanDigits ? `${targetCode} ${cleanDigits}` : '';
                             handleChange({ target: { name: 'phone', value: newFull } });
                           }}
-                          placeholder="7907243685"
+                          placeholder="e.g. 9876543210"
                           className="w-full h-[50px] bg-transparent pl-3 pr-4 py-3 text-sm text-[#5D0D1A] placeholder-[#5A6C66] focus:outline-none font-medium"
                         />
                       </div>
@@ -977,7 +1005,7 @@ export const StudentProfilePage = () => {
                           <AlertCircle size={12} /> {errors.phone}
                         </p>
                       ) : (
-                        <span className="text-[11px] text-[#5A6C66] mt-1 block">7 to 15 digits (e.g. +91 9876543210)</span>
+                        <span className="text-[11px] text-[#5A6C66] mt-1 block font-medium">Must be 10 digits starting with 6, 7, 8, or 9 (No letters or special characters)</span>
                       )}
                     </div>
                   </div>

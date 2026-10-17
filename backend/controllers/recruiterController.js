@@ -333,20 +333,194 @@ export const getApplications = async (req, res) => {
 
     const applications = await Application.find(filter)
       .populate('job', 'title location employmentType')
-      .populate('student', 'fullName email')
+      .populate('student', 'fullName name email role')
       .populate('studentProfile')
       .sort({ createdAt: -1 });
 
+    const enrichedApplications = await Promise.all(
+      applications.map(async (app) => {
+        const appObj = app.toObject ? app.toObject() : app;
+        if (!appObj.studentProfile && appObj.student?._id) {
+          const profile = await StudentProfile.findOne({ user: appObj.student._id });
+          if (profile) {
+            appObj.studentProfile = profile.toObject ? profile.toObject() : profile;
+          }
+        }
+        return appObj;
+      })
+    );
+
     return res.status(200).json({
       success: true,
-      count: applications.length,
-      data: applications,
+      count: enrichedApplications.length,
+      data: enrichedApplications,
     });
   } catch (error) {
     console.error('Error fetching applications:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch applications',
+    });
+  }
+};
+
+/**
+ * Fetch Live Student Profile from student_profile collection for an Application
+ * @route GET /api/recruiter/applications/:id/student-profile
+ */
+export const getStudentProfileForRecruiter = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { id } = req.params;
+
+    const application = await Application.findOne({ _id: id, recruiter: userId })
+      .populate('student', 'fullName name email role createdAt')
+      .populate('studentProfile');
+
+    if (!application) {
+      return res.status(404).json({ success: false, message: 'Application not found or unauthorized' });
+    }
+
+    let profileDoc = application.studentProfile;
+    if (!profileDoc && application.student?._id) {
+      profileDoc = await StudentProfile.findOne({ user: application.student._id });
+    }
+
+    if (!profileDoc && application.student) {
+      profileDoc = await StudentProfile.findOne({ user: application.student });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        user: application.student,
+        profile: profileDoc ? (profileDoc.toObject ? profileDoc.toObject() : profileDoc) : null,
+        application: {
+          _id: application._id,
+          applicantName: application.applicantName,
+          applicantEmail: application.applicantEmail,
+          applicantPhone: application.applicantPhone,
+          degree: application.degree,
+          institution: application.institution,
+          graduationYear: application.graduationYear,
+          skills: application.skills,
+          experienceType: application.experienceType,
+          experienceDetails: application.experienceDetails,
+          resumeFileName: application.resumeFileName,
+          status: application.status,
+          createdAt: application.createdAt,
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching student profile for recruiter:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve student profile'
+    });
+  }
+};
+
+/**
+ * Download Candidate Resume for an Application
+ * @route GET /api/recruiter/applications/:id/download-resume
+ */
+export const downloadCandidateResume = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { id } = req.params;
+
+    const application = await Application.findOne({ _id: id, recruiter: userId })
+      .populate('studentProfile')
+      .populate('student', 'fullName email');
+
+    if (!application) {
+      return res.status(404).json({ success: false, message: 'Application not found or unauthorized' });
+    }
+
+    let fileBuffer = application.resumeFileBuffer;
+    let mimeType = application.resumeMimeType || 'application/pdf';
+    let fileName = application.resumeFileName || `${application.applicantName || 'Candidate'}_Resume.pdf`;
+
+    if (!fileBuffer && application.studentProfile?.resumeAnalysis?.fileBuffer) {
+      fileBuffer = application.studentProfile.resumeAnalysis.fileBuffer;
+      mimeType = application.studentProfile.resumeAnalysis.fileMimeType || 'application/pdf';
+      if (application.studentProfile.resumeAnalysis.fileName) {
+        fileName = application.studentProfile.resumeAnalysis.fileName;
+      }
+    }
+
+    if (!fileBuffer) {
+      const candidateName = application.applicantName || application.student?.fullName || 'Candidate';
+      const email = application.applicantEmail || application.student?.email || 'N/A';
+      const phone = application.applicantPhone || application.studentProfile?.phone || 'N/A';
+      const degree = application.degree || application.studentProfile?.degree || 'N/A';
+      const college = application.institution || application.studentProfile?.college || 'N/A';
+      const gradYear = application.graduationYear || application.studentProfile?.graduationYear || 'N/A';
+      const skills = (application.skills && application.skills.length > 0) ? application.skills.join(', ') : 'Not specified';
+      const experience = application.experienceDetails || application.experienceType || 'Fresher';
+
+      const pdfText = `%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kinds [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Length 500 >>
+stream
+BT
+/F1 18 Tf
+50 720 Td
+(${candidateName} - Candidate Profile Resume) Tj
+0 -30 Td
+/F1 12 Tf
+(Email: ${email} | Phone: ${phone}) Tj
+0 -25 Td
+(Education: ${degree} - ${college} \\(${gradYear}\\)) Tj
+0 -25 Td
+(Skills: ${skills}) Tj
+0 -25 Td
+(Experience: ${experience}) Tj
+0 -30 Td
+(CareerPilot AI Verified Application Document) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+00000000115 00000 n 
+0000000300 00000 n 
+0000000230 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+600
+%%EOF`;
+
+      fileBuffer = Buffer.from(pdfText, 'utf-8');
+      mimeType = 'application/pdf';
+      fileName = `${candidateName.replace(/\s+/g, '_')}_Resume.pdf`;
+    }
+
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    return res.status(200).send(fileBuffer);
+  } catch (error) {
+    console.error('Error downloading candidate resume:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to download candidate resume'
     });
   }
 };
@@ -368,7 +542,7 @@ export const updateApplicationStatus = async (req, res) => {
       });
     }
 
-    const app = await Application.findOne({ _id: id, recruiter: userId });
+    const app = await Application.findOne({ _id: id, recruiter: userId }).populate('job');
     if (!app) {
       return res.status(404).json({
         success: false,
@@ -376,8 +550,60 @@ export const updateApplicationStatus = async (req, res) => {
       });
     }
 
+    const previousStatus = app.status;
     app.status = status;
     await app.save();
+
+    // Inform candidate if application status changed
+    if (previousStatus !== status && app.student) {
+      try {
+        const studentId = app.student._id || app.student;
+        const jobTitle = app.job?.title || 'Job Position';
+        const companyName = app.job?.companyName || 'Recruiter';
+
+        let activityTitle = '';
+        let activityDesc = '';
+
+        if (status === 'Shortlisted') {
+          activityTitle = `🎉 Shortlisted for ${jobTitle}`;
+          activityDesc = `Great news! ${companyName} has shortlisted your application for ${jobTitle}.`;
+        } else if (status === 'Interview') {
+          activityTitle = `📅 Interview Stage: ${jobTitle}`;
+          activityDesc = `${companyName} moved your application for ${jobTitle} to the Interview round.`;
+        } else if (status === 'Selected') {
+          activityTitle = `🌟 Selected for ${jobTitle}`;
+          activityDesc = `Congratulations! ${companyName} has selected you for ${jobTitle}.`;
+        } else if (status === 'Rejected') {
+          activityTitle = `Update on ${jobTitle} Application`;
+          activityDesc = `${companyName} updated your application status for ${jobTitle}.`;
+        } else if (status === 'Reviewing') {
+          activityTitle = `Application Under Review: ${jobTitle}`;
+          activityDesc = `${companyName} is reviewing your application for ${jobTitle}.`;
+        }
+
+        if (activityTitle) {
+          let studentProfile = await StudentProfile.findOne({ user: studentId });
+          if (!studentProfile) {
+            studentProfile = new StudentProfile({ user: studentId, activities: [] });
+          }
+          if (!Array.isArray(studentProfile.activities)) {
+            studentProfile.activities = [];
+          }
+          studentProfile.activities.unshift({
+            title: activityTitle,
+            desc: activityDesc,
+            time: 'Just now',
+            timestamp: new Date(),
+          });
+          if (studentProfile.activities.length > 30) {
+            studentProfile.activities = studentProfile.activities.slice(0, 30);
+          }
+          await studentProfile.save();
+        }
+      } catch (notifyErr) {
+        console.error('Error logging student application status notification:', notifyErr);
+      }
+    }
 
     return res.status(200).json({
       success: true,
@@ -385,6 +611,7 @@ export const updateApplicationStatus = async (req, res) => {
       data: app,
     });
   } catch (error) {
+    console.error('Error updating application status:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to update application status',

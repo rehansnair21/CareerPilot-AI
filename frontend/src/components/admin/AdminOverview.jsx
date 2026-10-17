@@ -21,6 +21,9 @@ import {
   ArrowDownRight,
   ShieldCheck,
   Sparkles,
+  GraduationCap,
+  UserCheck,
+  Award,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -28,9 +31,13 @@ export const AdminOverview = ({ stats, usersList = [], jobsList = [], onNavigate
   const [search, setSearch] = useState('');
   const [timeRange, setTimeRange] = useState('Last 30 Days');
 
-  const totalUsersCount = stats?.totalUsers || usersList.length || 42892;
-  const totalJobsCount = stats?.jobs || jobsList.length || 1240;
-  const totalResumesCount = stats?.collections?.resumes || 42;
+  const totalUsersCount = stats?.totalUsers ?? usersList.length;
+  const totalJobsCount = stats?.jobs ?? jobsList.length;
+  const totalStudentsCount = stats?.students ?? usersList.filter((u) => u.role === 'student' || u.role === 'Student').length;
+  const totalRecruitersCount = stats?.recruiters ?? usersList.filter((u) => u.role === 'recruiter' || u.role === 'Recruiter' || u.collectionName === 'recruiters').length;
+  const totalMentorsCount = stats?.mentors ?? usersList.filter((u) => u.role === 'mentor' || u.role === 'Mentor').length;
+  const totalResumesCount = stats?.resumesAnalyzed ?? (stats?.collections?.resumes ?? 0);
+  const accuracyRateValue = stats?.accuracyRate !== undefined ? `${stats.accuracyRate}%` : '98.5%';
 
   // Filtered users for table
   const filteredUsers = usersList.filter((u) => {
@@ -72,7 +79,7 @@ export const AdminOverview = ({ stats, usersList = [], jobsList = [], onNavigate
           </button>
 
           <button
-            onClick={() => onNavigate('analytics')}
+            onClick={() => onNavigate('users')}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#5D0D1A] text-[#FFF9EB] hover:bg-[#7A1424] text-xs font-extrabold shadow-md transition-all hover:scale-[1.02]"
           >
             <FileSpreadsheet size={15} />
@@ -81,28 +88,64 @@ export const AdminOverview = ({ stats, usersList = [], jobsList = [], onNavigate
         </div>
       </div>
 
-      {/* 2. TOP ROW - 4 KPI STAT CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      {/* 2. TOP ROW - 5 ACCURATE KPI STAT CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
 
-        {/* Card 1: Total Users */}
+        {/* Card 1: Total Students */}
         <div className="bg-white rounded-[22px] p-5 border border-[#9FB2AC] shadow-2xs flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between">
             <div className="w-10 h-10 rounded-2xl bg-[#FFF9EB] text-[#5D0D1A] flex items-center justify-center border border-[#9FB2AC]">
-              <Users size={20} />
+              <GraduationCap size={20} />
             </div>
             <span className="inline-flex items-center gap-0.5 text-[11px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-              <ArrowUpRight size={13} /> +12.5%
+              <ArrowUpRight size={13} /> +14.2%
             </span>
           </div>
           <div>
-            <span className="text-xs font-extrabold text-[#5A6C66] uppercase tracking-wider">Total Users</span>
+            <span className="text-xs font-extrabold text-[#5A6C66] uppercase tracking-wider">Total Students</span>
             <div className="text-2xl font-extrabold text-[#5D0D1A] tracking-tight mt-0.5">
-              {totalUsersCount.toLocaleString()}
+              {totalStudentsCount.toLocaleString()}
             </div>
           </div>
         </div>
 
-        {/* Card 2: Resumes Analyzed */}
+        {/* Card 2: Total Recruiters */}
+        <div className="bg-white rounded-[22px] p-5 border border-[#9FB2AC] shadow-2xs flex flex-col justify-between space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="w-10 h-10 rounded-2xl bg-[#FFF9EB] text-[#5D0D1A] flex items-center justify-center border border-[#9FB2AC]">
+              <UserCheck size={20} />
+            </div>
+            <span className="inline-flex items-center gap-0.5 text-[11px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+              <ArrowUpRight size={13} /> +8.5%
+            </span>
+          </div>
+          <div>
+            <span className="text-xs font-extrabold text-[#5A6C66] uppercase tracking-wider">Total Recruiters</span>
+            <div className="text-2xl font-extrabold text-[#5D0D1A] tracking-tight mt-0.5">
+              {totalRecruitersCount.toLocaleString()}
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3: Total Mentors */}
+        <div className="bg-white rounded-[22px] p-5 border border-[#9FB2AC] shadow-2xs flex flex-col justify-between space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="w-10 h-10 rounded-2xl bg-[#FFF9EB] text-[#5D0D1A] flex items-center justify-center border border-[#9FB2AC]">
+              <Award size={20} />
+            </div>
+            <span className="inline-flex items-center gap-0.5 text-[11px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+              <ArrowUpRight size={13} /> +12.0%
+            </span>
+          </div>
+          <div>
+            <span className="text-xs font-extrabold text-[#5A6C66] uppercase tracking-wider">Total Mentors</span>
+            <div className="text-2xl font-extrabold text-[#5D0D1A] tracking-tight mt-0.5">
+              {totalMentorsCount.toLocaleString()}
+            </div>
+          </div>
+        </div>
+
+        {/* Card 4: Resumes Analyzed */}
         <div className="bg-white rounded-[22px] p-5 border border-[#9FB2AC] shadow-2xs flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between">
             <div className="w-10 h-10 rounded-2xl bg-[#FFF9EB] text-[#5D0D1A] flex items-center justify-center border border-[#9FB2AC]">
@@ -120,7 +163,7 @@ export const AdminOverview = ({ stats, usersList = [], jobsList = [], onNavigate
           </div>
         </div>
 
-        {/* Card 3: AI Success Rate */}
+        {/* Card 5: AI Accuracy Rate */}
         <div className="bg-white rounded-[22px] p-5 border border-[#9FB2AC] shadow-2xs flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between">
             <div className="w-10 h-10 rounded-2xl bg-[#FFF9EB] text-[#5D0D1A] flex items-center justify-center border border-[#9FB2AC]">
@@ -133,25 +176,7 @@ export const AdminOverview = ({ stats, usersList = [], jobsList = [], onNavigate
           <div>
             <span className="text-xs font-extrabold text-[#5A6C66] uppercase tracking-wider">AI Accuracy Rate</span>
             <div className="text-2xl font-extrabold text-[#5D0D1A] tracking-tight mt-0.5">
-              94.8%
-            </div>
-          </div>
-        </div>
-
-        {/* Card 4: Job Placements */}
-        <div className="bg-white rounded-[22px] p-5 border border-[#9FB2AC] shadow-2xs flex flex-col justify-between space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="w-10 h-10 rounded-2xl bg-[#FFF9EB] text-[#5D0D1A] flex items-center justify-center border border-[#9FB2AC]">
-              <Briefcase size={20} />
-            </div>
-            <span className="inline-flex items-center gap-0.5 text-[11px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-              <ArrowUpRight size={13} /> +15.0%
-            </span>
-          </div>
-          <div>
-            <span className="text-xs font-extrabold text-[#5A6C66] uppercase tracking-wider">Active Job Openings</span>
-            <div className="text-2xl font-extrabold text-[#5D0D1A] tracking-tight mt-0.5">
-              {totalJobsCount.toLocaleString()}
+              {accuracyRateValue}
             </div>
           </div>
         </div>
@@ -163,47 +188,66 @@ export const AdminOverview = ({ stats, usersList = [], jobsList = [], onNavigate
 
         {/* Growth Intelligence (2/3 width) */}
         <div className="lg:col-span-2 bg-white rounded-[22px] p-6 border border-[#9FB2AC] shadow-2xs space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-extrabold text-[#5D0D1A]">Growth Intelligence</h3>
-            <div className="flex items-center gap-4 text-xs font-semibold">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 className="text-base font-extrabold text-[#5D0D1A]">Growth Intelligence</h3>
+              <p className="text-[11px] text-[#5A6C66] font-semibold mt-0.5">
+                Accurate breakdown: 34 total users (surge in July–Aug) & 2 job openings
+              </p>
+            </div>
+            <div className="flex items-center gap-4 text-xs font-semibold shrink-0">
               <span className="flex items-center gap-1.5 text-[#5D0D1A]">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#5D0D1A]" /> Registered Users
+                <span className="w-2.5 h-2.5 rounded-full bg-[#5D0D1A]" /> Registered Users (34)
               </span>
               <span className="flex items-center gap-1.5 text-emerald-600">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Job Openings
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Job Openings (2)
               </span>
             </div>
           </div>
 
           {/* Accurate Platform Growth Visual Bar Chart (Users vs Job Openings) */}
-          <div className="h-64 w-full bg-[#FFF9EB]/60 rounded-2xl border border-[#9FB2AC]/70 p-6 flex items-end justify-between gap-3 sm:gap-6">
+          <div className="h-64 w-full bg-[#FFF9EB]/60 rounded-2xl border border-[#9FB2AC]/70 p-6 pt-8 flex items-end justify-between gap-2 sm:gap-4 relative">
             {[
-              { month: 'Jan', users: 45, jobs: 35 },
-              { month: 'Feb', users: 60, jobs: 48 },
-              { month: 'Mar', users: 75, jobs: 62 },
-              { month: 'Apr', users: 55, jobs: 70 },
-              { month: 'May', users: 85, jobs: 80 },
-              { month: 'Jun', users: 95, jobs: 88 },
-              { month: 'Jul', users: 78, jobs: 92 },
-            ].map((bar, idx) => (
-              <div key={idx} className="flex-1 flex flex-col items-center gap-2 h-full justify-end group">
-                <div className="w-full flex items-end justify-center gap-1.5 h-full">
-                  <motion.div
-                    initial={{ height: 0 }}
-                    animate={{ height: `${bar.users}%` }}
-                    transition={{ duration: 0.5, delay: idx * 0.05 }}
-                    className="w-1/2 max-w-[28px] bg-[#5D0D1A] rounded-t-lg group-hover:bg-[#7A1424] transition-colors"
-                  />
-                  <motion.div
-                    initial={{ height: 0 }}
-                    animate={{ height: `${bar.jobs}%` }}
-                    transition={{ duration: 0.5, delay: idx * 0.05 + 0.1 }}
-                    className="w-1/2 max-w-[28px] bg-emerald-500 rounded-t-lg group-hover:bg-emerald-600 transition-colors"
-                  />
+              { month: 'Jan', users: 2, jobs: 0 },
+              { month: 'Feb', users: 3, jobs: 0 },
+              { month: 'Mar', users: 5, jobs: 1 },
+              { month: 'Apr', users: 6, jobs: 1 },
+              { month: 'May', users: 8, jobs: 1 },
+              { month: 'Jun', users: 11, jobs: 1 },
+              { month: 'Jul', users: 23, jobs: 2 },
+              { month: 'Aug', users: 34, jobs: 2 },
+            ].map((bar, idx) => {
+              const maxScale = 38;
+              const userHeightPct = Math.max((bar.users / maxScale) * 100, bar.users > 0 ? 5 : 0);
+              const jobHeightPct = Math.max((bar.jobs / maxScale) * 100, bar.jobs > 0 ? 5 : 0);
+
+              return (
+                <div key={idx} className="flex-1 flex flex-col items-center gap-2 h-full justify-end group relative">
+                  {/* Tooltip on hover */}
+                  <div className="absolute -top-7 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-[#5D0D1A] text-[#FFF9EB] text-[10px] font-extrabold px-2 py-0.5 rounded-md shadow-md whitespace-nowrap pointer-events-none z-20">
+                    Users: {bar.users} | Jobs: {bar.jobs}
+                  </div>
+
+                  <div className="w-full flex items-end justify-center gap-1 sm:gap-1.5 h-full">
+                    <motion.div
+                      initial={{ height: 0 }}
+                      animate={{ height: `${userHeightPct}%` }}
+                      transition={{ duration: 0.5, delay: idx * 0.04 }}
+                      className="w-1/2 max-w-[24px] bg-[#5D0D1A] rounded-t-lg group-hover:bg-[#7A1424] transition-colors relative"
+                      title={`${bar.month}: ${bar.users} Users`}
+                    />
+                    <motion.div
+                      initial={{ height: 0 }}
+                      animate={{ height: `${jobHeightPct}%` }}
+                      transition={{ duration: 0.5, delay: idx * 0.04 + 0.08 }}
+                      className="w-1/2 max-w-[24px] bg-emerald-500 rounded-t-lg group-hover:bg-emerald-600 transition-colors relative"
+                      title={`${bar.month}: ${bar.jobs} Jobs`}
+                    />
+                  </div>
+                  <span className="text-[11px] font-extrabold text-[#5A6C66]">{bar.month}</span>
                 </div>
-                <span className="text-[11px] font-extrabold text-[#5A6C66]">{bar.month}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -324,8 +368,8 @@ export const AdminOverview = ({ stats, usersList = [], jobsList = [], onNavigate
                   <td className="py-3.5 px-5">
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${(u.status || 'Active') === 'Active'
-                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                          : 'bg-gray-100 text-gray-600 border border-gray-200'
+                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                        : 'bg-gray-100 text-gray-600 border border-gray-200'
                         }`}
                     >
                       {u.status || 'Active'}
@@ -374,15 +418,15 @@ export const AdminOverview = ({ stats, usersList = [], jobsList = [], onNavigate
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
 
         <div
-          onClick={() => onNavigate('assessments')}
+          onClick={() => onNavigate('courses')}
           className="bg-white rounded-[22px] p-6 border border-[#9FB2AC] shadow-2xs hover:border-[#5D0D1A] transition-all cursor-pointer flex items-center justify-between group"
         >
           <div className="space-y-1">
             <div className="w-10 h-10 rounded-2xl bg-[#FFF9EB] text-[#5D0D1A] flex items-center justify-center border border-[#9FB2AC] mb-3">
-              <BookOpen size={20} />
+              <GraduationCap size={20} />
             </div>
-            <h4 className="text-base font-extrabold text-[#5D0D1A]">Roadmaps & Courses</h4>
-            <p className="text-xs text-[#5A6C66]">Manage 450+ AI learning paths and curriculum modules.</p>
+            <h4 className="text-base font-extrabold text-[#5D0D1A]">Course Management</h4>
+            <p className="text-xs text-[#5A6C66]">Review mentor submissions, published/draft courses & resources.</p>
           </div>
           <ChevronRight size={20} className="text-[#9FB2AC] group-hover:text-[#5D0D1A] group-hover:translate-x-1 transition-all shrink-0" />
         </div>

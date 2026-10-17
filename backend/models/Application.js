@@ -27,6 +27,56 @@ const applicationSchema = new mongoose.Schema(
       enum: ['New', 'Reviewing', 'Shortlisted', 'Interview', 'Selected', 'Rejected'],
       default: 'New',
     },
+    applicantName: {
+      type: String,
+      default: '',
+    },
+    applicantEmail: {
+      type: String,
+      default: '',
+    },
+    applicantPhone: {
+      type: String,
+      default: '',
+    },
+    degree: {
+      type: String,
+      default: '',
+    },
+    institution: {
+      type: String,
+      default: '',
+    },
+    graduationYear: {
+      type: String,
+      default: '',
+    },
+    skills: [
+      {
+        type: String,
+      },
+    ],
+    experienceType: {
+      type: String,
+      enum: ['Fresher', 'Experienced'],
+      default: 'Fresher',
+    },
+    experienceDetails: {
+      type: String,
+      default: 'Fresher',
+    },
+    resumeFileName: {
+      type: String,
+      default: '',
+    },
+    resumeFileBuffer: {
+      type: Buffer,
+      default: null,
+    },
+    resumeMimeType: {
+      type: String,
+      default: 'application/pdf',
+    },
     coverNote: {
       type: String,
       default: '',

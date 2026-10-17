@@ -6,10 +6,45 @@ import {
   updateStudentProfile,
   analyzeStudentResume,
   getLatestResumeAnalysis,
+  deleteStudentResume,
   syncResumeSkills,
   getAvailableJobsForStudent,
   applyToJob,
   downloadJobDescriptionPdf,
+  analyzeStudentPortfolio,
+  getLatestPortfolioAnalysis,
+  deleteStudentPortfolio,
+  generateAssessmentChallenge,
+  runAssessmentCode,
+  submitAssessmentCode,
+  getAssessmentHistory,
+  generateSoftSkillAssessment,
+  submitSoftSkillAssessment,
+  getSoftSkillAssessmentHistory,
+  getCareerRecommendations,
+  generateCareerRecommendationsController,
+  getStudentRoadmap,
+  saveStudentRoadmap,
+  getPublishedCoursesForStudent,
+  getStudentCourseDetails,
+  streamStudentCoursePDF,
+  submitStudentQuizAttempt,
+  getStudentQuizAttempts,
+  getStudentCourseLearningData,
+  toggleStudentItemProgress,
+  submitStudentAssignment,
+  enrollStudentInCourse,
+  createRazorpayOrder,
+  verifyRazorpayPayment,
+  getStudentEnrollments,
+  getCourseEnrollmentStatus,
+  getStudentMessages,
+  markStudentMessageAsRead,
+  replyToMentorMessage,
+  getStudentNotifications,
+  markStudentNotificationAsRead,
+  markAllStudentNotificationsAsRead,
+  getStudentUnreadCount,
 } from '../controllers/studentController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -44,11 +79,69 @@ router.put('/profile', protect, updateStudentProfile);
 // AI Resume Analysis Routes
 router.post('/resume/analyze', protect, upload.single('resume'), analyzeStudentResume);
 router.get('/resume/latest', protect, getLatestResumeAnalysis);
+router.delete('/resume', protect, deleteStudentResume);
 router.post('/resume/sync-skills', protect, syncResumeSkills);
 
-// Job Postings & Applications for Students
+// AI Portfolio Analysis Routes
+router.post('/portfolio/analyze', protect, analyzeStudentPortfolio);
+router.get('/portfolio/latest', protect, getLatestPortfolioAnalysis);
+router.delete('/portfolio', protect, deleteStudentPortfolio);
+
+// AI Coding Assessment Routes
+router.post('/assessment/generate-challenge', protect, generateAssessmentChallenge);
+router.post('/assessment/run-code', protect, runAssessmentCode);
+router.post('/assessment/submit', protect, submitAssessmentCode);
+router.get('/assessment/history', protect, getAssessmentHistory);
+
+// AI Soft Skill Assessment Routes
+router.post('/assessment/soft-skill/generate', protect, generateSoftSkillAssessment);
+router.post('/assessment/soft-skill/submit', protect, submitSoftSkillAssessment);
+router.get('/assessment/soft-skill/history', protect, getSoftSkillAssessmentHistory);
+
+// AI Career Recommendations Routes
+router.get('/career-recommendations', protect, getCareerRecommendations);
+router.post('/career-recommendations/generate', protect, generateCareerRecommendationsController);
+
+// Student Personalized Roadmap Routes (Isolated per user ID)
+router.get('/roadmap', protect, getStudentRoadmap);
+router.post('/roadmap/select', protect, saveStudentRoadmap);
+
+// Student Jobs & Job Application Routes
 router.get('/jobs', protect, getAvailableJobsForStudent);
-router.get('/jobs/:id/download-jd', protect, downloadJobDescriptionPdf);
-router.post('/jobs/apply', protect, applyToJob);
+router.post('/jobs/apply', protect, upload.single('resume'), applyToJob);
+router.get('/jobs/:jobId/download-jd', protect, downloadJobDescriptionPdf);
+
+// Published Mentor Courses & Learning Resources for Students
+router.get('/courses', protect, getPublishedCoursesForStudent);
+router.get('/courses/:courseId', protect, getStudentCourseDetails);
+router.get('/courses/:courseId/learning', protect, getStudentCourseLearningData);
+router.post('/courses/:courseId/progress/toggle-item', protect, toggleStudentItemProgress);
+router.post('/courses/:courseId/assignments/:resourceId/submit', protect, submitStudentAssignment);
+router.get('/courses/:courseId/pdf-resources/:resourceId/stream', protect, streamStudentCoursePDF);
+
+// Student Course Enrollments & Razorpay Payment Routes (course_enrollments collection)
+router.post('/courses/:courseId/create-order', protect, createRazorpayOrder);
+router.post('/courses/:courseId/verify-payment', protect, verifyRazorpayPayment);
+router.post('/courses/:courseId/enroll', protect, enrollStudentInCourse);
+router.get('/enrollments', protect, getStudentEnrollments);
+router.get('/courses/:courseId/enrollment-status', protect, getCourseEnrollmentStatus);
+
+// Student Course Quiz Submissions & Attempts
+router.post('/courses/:courseId/quizzes/:quizId/submit', protect, submitStudentQuizAttempt);
+router.get('/courses/:courseId/quizzes/:quizId/attempts', protect, getStudentQuizAttempts);
+
+// Mentor Messages for Students (Reception, Reading, Replying)
+router.get('/messages', protect, getStudentMessages);
+router.put('/messages/:messageId/read', protect, markStudentMessageAsRead);
+router.post('/messages/:messageId/reply', protect, replyToMentorMessage);
+
+// Student Notifications & Unread Counts
+router.get('/notifications', protect, getStudentNotifications);
+router.put('/notifications/read-all', protect, markAllStudentNotificationsAsRead);
+router.put('/notifications/:id/read', protect, markStudentNotificationAsRead);
+router.get('/unread-count', protect, getStudentUnreadCount);
 
 export default router;
+
+
+

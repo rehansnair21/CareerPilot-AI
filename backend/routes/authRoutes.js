@@ -1,5 +1,5 @@
 import express from 'express';
-import { registerUser, loginUser, getMe, getAllUsers } from '../controllers/authController.js';
+import { registerUser, loginUser, getMe, getAllUsers, googleVerify } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -12,6 +12,8 @@ router.post('/auth/login', loginUser);
 router.get('/me', protect, getMe);
 router.get('/users', getAllUsers);
 
+// Google OAuth (ID-token verification from frontend GSI popup)
+router.post('/google/verify', googleVerify);
+router.post('/auth/google/verify', googleVerify);
+
 export default router;
-
-

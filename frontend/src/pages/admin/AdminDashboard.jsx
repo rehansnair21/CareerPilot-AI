@@ -5,14 +5,9 @@ import api from '../../services/api';
 import { AdminSidebar } from '../../components/admin/AdminSidebar';
 import { AdminTopNavbar } from '../../components/admin/AdminTopNavbar';
 import { AdminOverview } from '../../components/admin/AdminOverview';
+import { AdminCourseManagement } from '../../components/admin/AdminCourseManagement';
 import { AdminUserManagement } from '../../components/admin/AdminUserManagement';
-import { AdminStudentManagement } from '../../components/admin/AdminStudentManagement';
-import { AdminRecruiterManagement } from '../../components/admin/AdminRecruiterManagement';
 import { AdminJobManagement } from '../../components/admin/AdminJobManagement';
-import { AdminApplicationManagement } from '../../components/admin/AdminApplicationManagement';
-import { AdminResumeAI } from '../../components/admin/AdminResumeAI';
-import { AdminAssessments } from '../../components/admin/AdminAssessments';
-import { AdminAnalytics } from '../../components/admin/AdminAnalytics';
 import { AdminNotifications } from '../../components/admin/AdminNotifications';
 import { AdminSettings } from '../../components/admin/AdminSettings';
 import { AdminProfile } from '../../components/admin/AdminProfile';
@@ -101,6 +96,35 @@ export const AdminDashboard = () => {
     } catch (err) {
       console.error('Error deleting user:', err);
       alert(err.response?.data?.message || 'Failed to delete user account');
+    }
+  };
+
+  // Handle Activating / Deactivating User Account
+  const handleToggleUserStatus = async (userToToggle) => {
+    if (userToToggle.role === 'admin') {
+      alert('Admin accounts cannot be deactivated.');
+      return;
+    }
+
+    const nextAction = userToToggle.isActive !== false ? 'deactivate' : 'activate';
+    if (
+      !window.confirm(
+        `Are you sure you want to ${nextAction} account for "${userToToggle.fullName || userToToggle.name || userToToggle.username}"?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const res = await api.put(`/admin/users/${userToToggle.collectionName}/${userToToggle._id}/toggle-status`);
+      if (res.data && res.data.success) {
+        setSuccessMsg(res.data.message);
+        setTimeout(() => setSuccessMsg(''), 4000);
+        await fetchData();
+      }
+    } catch (err) {
+      console.error('Error toggling user status:', err);
+      alert(err.response?.data?.message || 'Failed to update user active status');
     }
   };
 
@@ -205,46 +229,20 @@ export const AdminDashboard = () => {
                   />
                 )}
 
+                {activeTab === 'courses' && (
+                  <AdminCourseManagement />
+                )}
+
                 {activeTab === 'users' && (
                   <AdminUserManagement
                     usersList={usersList}
                     onDeleteUser={handleDeleteUser}
-                  />
-                )}
-
-                {activeTab === 'students' && (
-                  <AdminStudentManagement
-                    usersList={usersList}
-                    onDeleteUser={handleDeleteUser}
-                  />
-                )}
-
-                {activeTab === 'recruiters' && (
-                  <AdminRecruiterManagement
-                    usersList={usersList}
-                    jobsList={jobsList}
-                    onDeleteUser={handleDeleteUser}
+                    onToggleUserStatus={handleToggleUserStatus}
                   />
                 )}
 
                 {activeTab === 'jobs' && (
                   <AdminJobManagement jobsList={jobsList} />
-                )}
-
-                {activeTab === 'applications' && (
-                  <AdminApplicationManagement />
-                )}
-
-                {activeTab === 'resume-ai' && (
-                  <AdminResumeAI />
-                )}
-
-                {activeTab === 'assessments' && (
-                  <AdminAssessments />
-                )}
-
-                {activeTab === 'analytics' && (
-                  <AdminAnalytics stats={stats} />
                 )}
 
                 {activeTab === 'notifications' && (

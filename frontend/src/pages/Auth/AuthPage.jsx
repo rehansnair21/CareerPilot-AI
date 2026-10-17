@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -20,8 +20,154 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 
+// ─── Google Sign-In Button Component ──────────────────────────────────────────
+const GoogleSignInButton = ({ onSuccess, onError, role }) => {
+  const btnRef = useRef(null);
+  const [googleLoaded, setGoogleLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Load the Google GSI script if not already loaded
+    const existingScript = document.getElementById('google-gsi-script');
+    if (existingScript) {
+      if (window.google && window.google.accounts) {
+        setGoogleLoaded(true);
+      } else {
+        existingScript.addEventListener('load', () => setGoogleLoaded(true));
+      }
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = 'google-gsi-script';
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setGoogleLoaded(true);
+    script.onerror = () => console.error('Failed to load Google GSI script');
+    document.head.appendChild(script);
+  }, []);
+
+  const handleGoogleClick = () => {
+    if (!window.google || !window.google.accounts) {
+      onError('Google Sign-In is not ready yet. Please try again.');
+      return;
+    }
+
+    setLoading(true);
+
+    window.google.accounts.id.initialize({
+      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+      callback: async (response) => {
+        setLoading(false);
+        if (response.credential) {
+          await onSuccess(response.credential);
+        } else {
+          onError('Google Sign-In was cancelled or failed. Please try again.');
+        }
+      },
+      auto_select: false,
+      cancel_on_tap_outside: true,
+    });
+
+    // Use prompt() to show the Google One Tap / account chooser
+    window.google.accounts.id.prompt((notification) => {
+      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+        // Fallback: render a hidden button and click it
+        setLoading(false);
+        if (btnRef.current) {
+          window.google.accounts.id.renderButton(btnRef.current, {
+            type: 'standard',
+            theme: 'outline',
+            size: 'large',
+            text: 'signin_with',
+            shape: 'rectangular',
+          });
+          const hiddenBtn = btnRef.current.querySelector('div[role="button"]');
+          if (hiddenBtn) hiddenBtn.click();
+        }
+      }
+    });
+  };
+
+  return (
+    <div style={{ width: '100%' }}>
+      {/* Hidden div for GSI button fallback */}
+      <div ref={btnRef} style={{ display: 'none' }}></div>
+
+      <button
+        type="button"
+        className="btn-google"
+        onClick={handleGoogleClick}
+        disabled={loading || !googleLoaded}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '10px',
+          width: '100%',
+          padding: '11px 20px',
+          background: '#ffffff',
+          border: '1.5px solid #e2e8f0',
+          borderRadius: '10px',
+          cursor: loading || !googleLoaded ? 'not-allowed' : 'pointer',
+          fontSize: '14px',
+          fontWeight: '600',
+          color: '#1e293b',
+          transition: 'all 0.2s ease',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+          opacity: !googleLoaded ? 0.7 : 1,
+          fontFamily: 'inherit',
+        }}
+        onMouseEnter={(e) => {
+          if (!loading && googleLoaded) {
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)';
+            e.currentTarget.style.borderColor = '#cbd5e1';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)';
+          e.currentTarget.style.borderColor = '#e2e8f0';
+          e.currentTarget.style.transform = 'translateY(0)';
+        }}
+      >
+        {loading ? (
+          <div className="spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }}></div>
+        ) : (
+          <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+            <g fill="none" fillRule="evenodd">
+              <path d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+              <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+              <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+              <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+            </g>
+          </svg>
+        )}
+        <span>{loading ? 'Signing in...' : 'Continue with Google'}</span>
+      </button>
+    </div>
+  );
+};
+
+// ─── Divider Component ─────────────────────────────────────────────────────────
+const OrDivider = () => (
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    margin: '4px 0',
+    width: '100%',
+  }}>
+    <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
+    <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: '500', whiteSpace: 'nowrap' }}>or continue with email</span>
+    <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
+  </div>
+);
+
+// ─── Main AuthPage Component ───────────────────────────────────────────────────
 export const AuthPage = ({ initialMode = 'login' }) => {
-  const { user, login, register } = useAuth();
+  const { user, login, register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   // Redirect if already logged in
@@ -33,6 +179,8 @@ export const AuthPage = ({ initialMode = 'login' }) => {
         navigate('/recruiter/dashboard', { replace: true });
       } else if (user.role === 'admin') {
         navigate('/admin/dashboard', { replace: true });
+      } else if (user.role === 'mentor') {
+        navigate('/mentor/dashboard', { replace: true });
       } else {
         navigate('/', { replace: true });
       }
@@ -152,13 +300,38 @@ export const AuthPage = ({ initialMode = 'login' }) => {
       icon: <Briefcase className="role-icon-svg" size={20} />,
       desc: 'Discover & Hire Top Talent',
     },
-    {
-      id: 'admin',
-      title: 'Admin',
-      icon: <ShieldCheck className="role-icon-svg" size={20} />,
-      desc: 'System & Database Control',
-    },
   ];
+
+  // ─── Google Sign-In Handlers ─────────────────────────────────────────────────
+
+  const [googleLoginLoading, setGoogleLoginLoading] = useState(false);
+  const [googleRegLoading, setGoogleRegLoading] = useState(false);
+
+  const handleGoogleLoginSuccess = async (credential) => {
+    setGoogleLoginLoading(true);
+    setLoginError('');
+    setLoginSuccess('');
+    const result = await loginWithGoogle(credential, loginData.role);
+    setGoogleLoginLoading(false);
+    if (result && result.success) {
+      setLoginSuccess('Google sign-in successful! Welcome to Career Pilot AI.');
+    } else {
+      setLoginError(result?.message || 'Google sign-in failed. Please try again.');
+    }
+  };
+
+  const handleGoogleRegSuccess = async (credential) => {
+    setGoogleRegLoading(true);
+    setRegError('');
+    setRegSuccess('');
+    const result = await loginWithGoogle(credential, regData.role);
+    setGoogleRegLoading(false);
+    if (result && result.success) {
+      setRegSuccess('Google account connected successfully! Redirecting...');
+    } else {
+      setRegError(result?.message || 'Google sign-up failed. Please try again.');
+    }
+  };
 
   // Handle Registration Submit
   const handleRegisterSubmit = async (e) => {
@@ -330,6 +503,15 @@ export const AuthPage = ({ initialMode = 'login' }) => {
               </div>
             </div>
 
+            {/* Google Sign-Up Button */}
+            <GoogleSignInButton
+              role={regData.role}
+              onSuccess={handleGoogleRegSuccess}
+              onError={(msg) => setRegError(msg)}
+            />
+
+            <OrDivider />
+
             {/* Name Input */}
             <div className="input-group">
               <input
@@ -492,7 +674,14 @@ export const AuthPage = ({ initialMode = 'login' }) => {
               </div>
             </div>
 
+            {/* Google Sign-In Button */}
+            <GoogleSignInButton
+              role={loginData.role}
+              onSuccess={handleGoogleLoginSuccess}
+              onError={(msg) => setLoginError(msg)}
+            />
 
+            <OrDivider />
 
             {/* Email / Username Input */}
             <div className="input-group">
@@ -500,7 +689,7 @@ export const AuthPage = ({ initialMode = 'login' }) => {
                 type="text"
                 name="login_email_field"
                 className="input-field"
-                placeholder={loginData.role === 'admin' ? "Admin Username or Email" : "Email Address"}
+                placeholder="Email Address or Username"
                 value={loginData.email}
                 onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
                 autoComplete="off"

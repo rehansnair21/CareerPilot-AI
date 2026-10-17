@@ -22,7 +22,7 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, 'Please provide a password'],
+      required: false,
       minlength: [6, 'Password must be at least 6 characters long'],
       select: false
     },
@@ -57,6 +57,10 @@ const userSchema = new mongoose.Schema(
     isVerified: {
       type: Boolean,
       default: false
+    },
+    isActive: {
+      type: Boolean,
+      default: true
     }
   },
   {

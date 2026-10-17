@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import Recruiter from '../models/Recruiter.js';
 import Admin from '../models/Admin.js';
+import Mentor from '../models/Mentor.js';
 
 export const protect = async (req, res, next) => {
   let token;
@@ -26,8 +27,26 @@ export const protect = async (req, res, next) => {
       if (!user && decoded.email) {
         user = await Admin.findOne({ email: decoded.email.toLowerCase() }).select('-password');
       }
+      if (user) {
+        user = user.toObject ? user.toObject() : user;
+        user.role = 'admin';
+      }
 
-      // 2. Try finding in User model (students/mentors)
+      // 2. Try finding in Mentor model (mentors collection)
+      if (!user) {
+        if (decoded.id) {
+          user = await Mentor.findById(decoded.id).select('-password');
+        }
+        if (!user && decoded.email) {
+          user = await Mentor.findOne({ email: decoded.email.toLowerCase() }).select('-password');
+        }
+        if (user) {
+          user = user.toObject ? user.toObject() : user;
+          user.role = 'mentor';
+        }
+      }
+
+      // 3. Try finding in User model (students)
       if (!user) {
         if (decoded.id) {
           user = await User.findById(decoded.id).select('-password');
@@ -37,13 +56,17 @@ export const protect = async (req, res, next) => {
         }
       }
 
-      // 3. Try finding in Recruiter model (recruiters table)
+      // 4. Try finding in Recruiter model (recruiters table)
       if (!user) {
         if (decoded.id) {
           user = await Recruiter.findById(decoded.id).select('-password');
         }
         if (!user && decoded.email) {
           user = await Recruiter.findOne({ email: decoded.email.toLowerCase() }).select('-password');
+        }
+        if (user) {
+          user = user.toObject ? user.toObject() : user;
+          user.role = 'recruiter';
         }
       }
 

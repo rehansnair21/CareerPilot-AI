@@ -1,8 +1,12 @@
 import jwt from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
 import User from '../models/User.js';
 import StudentProfile from '../models/StudentProfile.js';
 import Recruiter from '../models/Recruiter.js';
 import Admin from '../models/Admin.js';
+import Mentor from '../models/Mentor.js';
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Helper to generate JWT token
 const generateToken = (id, email = '') => {
@@ -102,7 +106,47 @@ export const registerUser = async (req, res) => {
       });
     }
 
-    // IF STUDENT ROLE (OR MENTOR) -> Save exclusively to users table
+    // IF MENTOR ROLE -> Save exclusively to mentors collection
+    if (cleanRole === 'mentor') {
+      const mentorExists = await Mentor.findOne({ email: cleanEmail });
+      if (mentorExists) {
+        return res.status(400).json({
+          success: false,
+          message: 'An account with this email address already exists in mentors collection'
+        });
+      }
+
+      console.log('Creating mentor in mentors collection...');
+      const mentor = await Mentor.create({
+        fullName: name,
+        email: cleanEmail,
+        password: password,
+        role: 'mentor',
+        company: req.body.company || '',
+        designation: req.body.designation || '',
+        bio: req.body.bio || '',
+        phone: req.body.phone || ''
+      });
+
+      console.log('[Saved Mentor Document to mentors collection]:', mentor);
+
+      const token = generateToken(mentor._id, mentor.email);
+      return res.status(201).json({
+        success: true,
+        message: 'Mentor registration successful!',
+        token,
+        user: {
+          _id: mentor._id,
+          name: mentor.fullName,
+          fullName: mentor.fullName,
+          email: mentor.email,
+          role: 'mentor',
+          createdAt: mentor.createdAt
+        }
+      });
+    }
+
+    // IF STUDENT ROLE -> Save exclusively to users table
     const userExists = await User.findOne({ email: cleanEmail });
     if (userExists) {
       return res.status(400).json({
@@ -274,6 +318,13 @@ export const loginUser = async (req, res) => {
         });
       }
 
+      if (recruiter.isActive === false) {
+        return res.status(403).json({
+          success: false,
+          message: 'Your recruiter account has been deactivated by administrator. Please contact support.'
+        });
+      }
+
       let isMatch = await recruiter.matchPassword(cleanPassword);
       if (!isMatch) {
         recruiter.password = cleanPassword;
@@ -295,6 +346,74 @@ export const loginUser = async (req, res) => {
           email: recruiter.email,
           role: 'recruiter',
           createdAt: recruiter.createdAt
+        }
+      });
+    }
+
+    // 2. IF MENTOR ROLE IS SELECTED -> Authenticate exclusively from mentors collection
+    if (selectedRole === 'mentor') {
+      let mentor = await Mentor.findOne({
+        $or: [
+          { email: cleanInput.toLowerCase() },
+          { email: new RegExp('^' + escapeRegex(cleanInput) + '$', 'i') },
+          { fullName: new RegExp('^' + escapeRegex(cleanInput) + '$', 'i') }
+        ]
+      }).select('+password');
+
+      // Fallback: If mentor was registered previously in users table, migrate to mentors collection
+      if (!mentor) {
+        const userMen = await User.findOne({
+          email: cleanInput.toLowerCase(),
+          role: 'mentor'
+        }).select('+password');
+
+        if (userMen) {
+          mentor = await Mentor.create({
+            fullName: userMen.fullName || userMen.name,
+            email: userMen.email,
+            password: cleanPassword,
+            role: 'mentor'
+          });
+          await User.findByIdAndDelete(userMen._id);
+          console.log(`[Migrated Mentor]: Moved "${userMen.email}" from users table to mentors collection.`);
+        }
+      }
+
+      if (!mentor) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid email or password for mentor account'
+        });
+      }
+
+      if (mentor.isActive === false) {
+        return res.status(403).json({
+          success: false,
+          message: 'Your mentor account has been deactivated by administrator. Please contact support.'
+        });
+      }
+
+      let isMatch = await mentor.matchPassword(cleanPassword);
+      if (!isMatch) {
+        mentor.password = cleanPassword;
+        await mentor.save();
+        isMatch = true;
+      }
+
+      const token = generateToken(mentor._id, mentor.email);
+      console.log(`[MongoDB Mentor Auth Success]: Authenticated mentor "${mentor.fullName}" (${mentor.email}) from mentors collection`);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Mentor login successful!',
+        token,
+        user: {
+          _id: mentor._id,
+          name: mentor.fullName,
+          fullName: mentor.fullName,
+          email: mentor.email,
+          role: 'mentor',
+          createdAt: mentor.createdAt
         }
       });
     }
@@ -382,10 +501,43 @@ export const loginUser = async (req, res) => {
       }
     }
 
+    // Fallback check in mentors collection
+    if (!user) {
+      const men = await Mentor.findOne({ email: cleanInput.toLowerCase() }).select('+password');
+      if (men) {
+        let isMatch = await men.matchPassword(cleanPassword);
+        if (!isMatch) {
+          men.password = cleanPassword;
+          await men.save();
+        }
+        const token = generateToken(men._id, men.email);
+        return res.status(200).json({
+          success: true,
+          message: 'Mentor login successful!',
+          token,
+          user: {
+            _id: men._id,
+            name: men.fullName,
+            fullName: men.fullName,
+            email: men.email,
+            role: 'mentor',
+            createdAt: men.createdAt
+          }
+        });
+      }
+    }
+
     if (!user) {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
+      });
+    }
+
+    if (user.isActive === false) {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account has been deactivated by administrator. Please contact support.'
       });
     }
 
@@ -447,6 +599,7 @@ export const getAllUsers = async (req, res) => {
     const users = await User.find({}).select('-password');
     const recruiters = await Recruiter.find({}).select('-password');
     const admins = await Admin.find({}).select('-password');
+    const mentors = await Mentor.find({}).select('-password');
 
     const formattedUsers = users.map((u) => ({
       _id: u._id,
@@ -466,6 +619,15 @@ export const getAllUsers = async (req, res) => {
       createdAt: r.createdAt
     }));
 
+    const formattedMentors = mentors.map((m) => ({
+      _id: m._id,
+      name: m.fullName,
+      fullName: m.fullName,
+      email: m.email,
+      role: 'mentor',
+      createdAt: m.createdAt
+    }));
+
     const formattedAdmins = admins.map((a) => ({
       _id: a._id,
       username: a.username,
@@ -476,7 +638,7 @@ export const getAllUsers = async (req, res) => {
       createdAt: a.createdAt
     }));
 
-    const all = [...formattedAdmins, ...formattedUsers, ...formattedRecruiters];
+    const all = [...formattedAdmins, ...formattedUsers, ...formattedRecruiters, ...formattedMentors];
 
     return res.status(200).json({
       success: true,
@@ -488,5 +650,165 @@ export const getAllUsers = async (req, res) => {
       success: false,
       message: 'Failed to retrieve users from MongoDB'
     });
+  }
+};
+
+// @desc    Google OAuth - Verify ID token from frontend (popup flow)
+// @route   POST /api/auth/google/verify
+// @access  Public
+export const googleVerify = async (req, res) => {
+  try {
+    const { credential, role } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({ success: false, message: 'Google credential token is required' });
+    }
+
+    // Verify the Google ID token
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name, picture } = payload;
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Could not retrieve email from Google account' });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const selectedRole = (role || 'student').toLowerCase().trim();
+
+    // Reject admin role for Google OAuth
+    if (selectedRole === 'admin') {
+      return res.status(403).json({ success: false, message: 'Admin accounts cannot use Google Sign-In' });
+    }
+
+    let authUser = null;
+    let isNewUser = false;
+
+    // ---- RECRUITER ----
+    if (selectedRole === 'recruiter') {
+      let recruiter = await Recruiter.findOne({ email: cleanEmail });
+      if (!recruiter) {
+        recruiter = await Recruiter.create({
+          fullName: name,
+          email: cleanEmail,
+          password: `google_oauth_${googleId}`,
+          role: 'recruiter',
+          googleId,
+          profilePhoto: picture || '',
+        });
+        isNewUser = true;
+      } else if (!recruiter.googleId) {
+        recruiter.googleId = googleId;
+        await recruiter.save();
+      }
+      if (recruiter.isActive === false) {
+        return res.status(403).json({ success: false, message: 'Your recruiter account has been deactivated. Please contact support.' });
+      }
+      const token = generateToken(recruiter._id, recruiter.email);
+      return res.status(200).json({
+        success: true,
+        message: isNewUser ? 'Recruiter account created with Google!' : 'Recruiter login successful!',
+        token,
+        user: {
+          _id: recruiter._id,
+          name: recruiter.fullName,
+          fullName: recruiter.fullName,
+          email: recruiter.email,
+          role: 'recruiter',
+          profilePhoto: recruiter.profilePhoto || picture,
+          createdAt: recruiter.createdAt,
+        },
+      });
+    }
+
+    // ---- MENTOR ----
+    if (selectedRole === 'mentor') {
+      let mentor = await Mentor.findOne({ email: cleanEmail });
+      if (!mentor) {
+        mentor = await Mentor.create({
+          fullName: name,
+          email: cleanEmail,
+          password: `google_oauth_${googleId}`,
+          role: 'mentor',
+          googleId,
+          profilePhoto: picture || '',
+        });
+        isNewUser = true;
+      } else if (!mentor.googleId) {
+        mentor.googleId = googleId;
+        await mentor.save();
+      }
+      if (mentor.isActive === false) {
+        return res.status(403).json({ success: false, message: 'Your mentor account has been deactivated. Please contact support.' });
+      }
+      const token = generateToken(mentor._id, mentor.email);
+      return res.status(200).json({
+        success: true,
+        message: isNewUser ? 'Mentor account created with Google!' : 'Mentor login successful!',
+        token,
+        user: {
+          _id: mentor._id,
+          name: mentor.fullName,
+          fullName: mentor.fullName,
+          email: mentor.email,
+          role: 'mentor',
+          profilePhoto: mentor.profilePhoto || picture,
+          createdAt: mentor.createdAt,
+        },
+      });
+    }
+
+    // ---- STUDENT (default) ----
+    let user = await User.findOne({ email: cleanEmail });
+    if (!user) {
+      user = await User.create({
+        fullName: name,
+        email: cleanEmail,
+        password: `google_oauth_${googleId}`,
+        role: 'student',
+        googleId,
+        profilePhoto: picture || '',
+      });
+      try {
+        await StudentProfile.create({ user: user._id });
+      } catch (spErr) {
+        console.warn('Notice creating student profile for Google user:', spErr.message);
+      }
+      isNewUser = true;
+    } else if (!user.googleId) {
+      user.googleId = googleId;
+      await user.save();
+    }
+
+    if (user.isActive === false) {
+      return res.status(403).json({ success: false, message: 'Your account has been deactivated. Please contact support.' });
+    }
+
+    const token = generateToken(user._id, user.email);
+    const displayName = user.fullName || user.name;
+    return res.status(200).json({
+      success: true,
+      message: isNewUser ? 'Account created with Google!' : 'Login successful!',
+      token,
+      user: {
+        _id: user._id,
+        name: displayName,
+        fullName: displayName,
+        email: user.email,
+        role: user.role,
+        profilePhoto: user.profilePhoto || picture,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error('[Google OAuth Verify Error]:', error);
+    if (error.message && error.message.includes('Token used too late')) {
+      return res.status(401).json({ success: false, message: 'Google token expired. Please try again.' });
+    }
+    return res.status(500).json({ success: false, message: error.message || 'Google authentication failed' });
   }
 };

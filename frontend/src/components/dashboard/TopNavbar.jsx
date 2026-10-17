@@ -36,6 +36,34 @@ export const TopNavbar = ({ onOpenMobileSidebar, setActiveTab, userProfilePhoto 
     return () => window.removeEventListener('profileUpdated', handleProfileUpdated);
   }, []);
 
+  const [totalUnreadCount, setTotalUnreadCount] = useState(0);
+
+  const fetchUnreadCounts = async () => {
+    if (!user) return;
+    try {
+      if (user.role === 'student') {
+        const res = await api.get('/student/unread-count');
+        if (res.data && res.data.success && res.data.data) {
+          setTotalUnreadCount(res.data.data.totalUnread || 0);
+        }
+      } else if (user.role === 'mentor') {
+        const res = await api.get('/mentor/unread-count');
+        if (res.data && res.data.success && res.data.data) {
+          setTotalUnreadCount(res.data.data.totalUnread || 0);
+        }
+      }
+    } catch (err) {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    fetchUnreadCounts();
+    const handleUpdate = () => fetchUnreadCounts();
+    window.addEventListener('unreadMessagesUpdated', handleUpdate);
+    return () => window.removeEventListener('unreadMessagesUpdated', handleUpdate);
+  }, [user]);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -94,12 +122,26 @@ export const TopNavbar = ({ onOpenMobileSidebar, setActiveTab, userProfilePhoto 
       <div className="flex items-center gap-3 md:gap-4">
         {/* Notification Bell */}
         <button
-          onClick={() => (setActiveTab ? setActiveTab('notifications') : navigate('/student/dashboard'))}
+          onClick={() => {
+            if (setActiveTab) {
+              setActiveTab('messages');
+            } else if (user?.role === 'mentor') {
+              navigate('/mentor/dashboard', { state: { activeTab: 'messages' } });
+            } else {
+              navigate('/student/dashboard', { state: { activeTab: 'messages' } });
+            }
+          }}
           className="relative p-2.5 text-[#5A6C66] hover:text-[#5D0D1A] hover:bg-[#FFF9EB] rounded-xl transition-colors"
-          title="Notifications"
+          title="Mentor Messages & Notifications"
         >
           <Bell size={19} />
-          <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-[#5D0D1A] rounded-full ring-2 ring-white" />
+          {totalUnreadCount > 0 ? (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-rose-600 text-white rounded-full text-[10px] font-black flex items-center justify-center px-1 shadow-xs border-2 border-white">
+              {totalUnreadCount > 9 ? '9+' : totalUnreadCount}
+            </span>
+          ) : (
+            <span className="absolute top-2 right-2 w-2 h-2 bg-[#5D0D1A]/50 rounded-full ring-2 ring-white" />
+          )}
         </button>
 
         <div className="h-5 w-[1px] bg-[#9FB2AC] hidden sm:block" />
