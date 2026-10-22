@@ -5,6 +5,9 @@ import {
   deleteUserAdmin,
   toggleUserStatusAdmin,
   getAllJobsAdmin,
+  getJobDetailsAdmin,
+  toggleJobStatusAdmin,
+  deleteJobAdmin,
   getAllCoursesAdmin,
   getCourseDetailsAdmin,
   getCourseEnrollmentsAdmin,
@@ -27,6 +30,9 @@ router.get('/users', getAllUsersAdmin);
 router.put('/users/:collectionName/:id/toggle-status', toggleUserStatusAdmin);
 router.delete('/users/:collectionName/:id', deleteUserAdmin);
 router.get('/jobs', getAllJobsAdmin);
+router.get('/jobs/:id', getJobDetailsAdmin);
+router.put('/jobs/:id/toggle-status', toggleJobStatusAdmin);
+router.delete('/jobs/:id', deleteJobAdmin);
 
 // Admin Course Management Routes
 router.get('/courses', getAllCoursesAdmin);

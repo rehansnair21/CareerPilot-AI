@@ -43,7 +43,7 @@ export const getAdminStats = async (req, res) => {
     const totalMentors = totalMentorsInCollection + totalMentorsInUsers;
     const totalRecruiters = await Recruiter.countDocuments();
     const totalAdmins = await Admin.countDocuments();
-    const totalJobs = await Job.countDocuments();
+    const totalJobs = await Job.countDocuments({ isDeleted: { $ne: true } });
     const totalApplications = await Application.countDocuments();
 
     // Accurately count profiles with analyzed resumes in MongoDB
@@ -208,22 +208,143 @@ export const deleteUserAdmin = async (req, res) => {
   }
 };
 
-// @desc    Get all jobs for Admin
+// @desc    Get all jobs for Admin with dynamic applicant counts
 // @route   GET /api/admin/jobs
 // @access  Private (Admin)
 export const getAllJobsAdmin = async (req, res) => {
   try {
-    const jobs = await Job.find({}).sort({ createdAt: -1 });
+    const jobs = await Job.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 });
+
+    // Calculate dynamic applicant counts from database
+    const jobIds = jobs.map((j) => j._id);
+    const appCounts = await Application.aggregate([
+      { $match: { job: { $in: jobIds } } },
+      { $group: { _id: '$job', count: { $sum: 1 } } }
+    ]);
+
+    const countMap = new Map(appCounts.map((a) => [a._id.toString(), a.count]));
+
+    const jobsWithRealCounts = jobs.map((j) => {
+      const realCount = countMap.get(j._id.toString()) || 0;
+      return {
+        ...j.toObject(),
+        applicationsCount: realCount,
+      };
+    });
+
     return res.status(200).json({
       success: true,
-      count: jobs.length,
-      jobs
+      count: jobsWithRealCounts.length,
+      jobs: jobsWithRealCounts
     });
   } catch (error) {
     console.error('Error fetching admin jobs:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve job postings'
+    });
+  }
+};
+
+// @desc    Toggle active status of a job (Activate / Deactivate)
+// @route   PUT /api/admin/jobs/:id/toggle-status
+// @access  Private (Admin)
+export const toggleJobStatusAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const job = await Job.findOne({ _id: id, isDeleted: { $ne: true } });
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Job posting not found' });
+    }
+
+    const currentStatus = (job.status || 'Active').toLowerCase();
+    const newStatus = currentStatus === 'active' ? 'Deactivated' : 'Active';
+    job.status = newStatus;
+    await job.save();
+
+    const actualCount = await Application.countDocuments({ job: job._id });
+
+    return res.status(200).json({
+      success: true,
+      message: `Job "${job.title}" has been ${newStatus === 'Active' ? 'reactivated' : 'deactivated'}.`,
+      job: {
+        ...job.toObject(),
+        applicationsCount: actualCount,
+      }
+    });
+  } catch (error) {
+    console.error('Error toggling job status:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update job status'
+    });
+  }
+};
+
+// @desc    Soft delete job while preserving application records
+// @route   DELETE /api/admin/jobs/:id
+// @access  Private (Admin)
+export const deleteJobAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const job = await Job.findById(id);
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Job posting not found' });
+    }
+
+    // Soft delete to preserve related application records
+    job.isDeleted = true;
+    job.deletedAt = new Date();
+    job.status = 'Closed';
+    await job.save();
+
+    // Preserve all application records
+    const preservedAppsCount = await Application.countDocuments({ job: id });
+
+    return res.status(200).json({
+      success: true,
+      message: `Job "${job.title}" has been deleted. ${preservedAppsCount} applicant records preserved.`,
+      jobId: id,
+      preservedApplicationsCount: preservedAppsCount
+    });
+  } catch (error) {
+    console.error('Error deleting job:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete job posting'
+    });
+  }
+};
+
+// @desc    Get detailed job record with applicant list for Admin
+// @route   GET /api/admin/jobs/:id
+// @access  Private (Admin)
+export const getJobDetailsAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const job = await Job.findById(id);
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Job posting not found' });
+    }
+
+    // Fetch related applications and applicant records
+    const applications = await Application.find({ job: id })
+      .select('applicantName applicantEmail applicantPhone degree institution experienceType status createdAt')
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      job: {
+        ...job.toObject(),
+        applicationsCount: applications.length,
+        applications,
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching job details:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to load job details'
     });
   }
 };

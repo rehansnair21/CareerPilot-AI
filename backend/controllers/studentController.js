@@ -902,7 +902,7 @@ export const getAvailableJobsForStudent = async (req, res) => {
     const userId = req.user._id;
     const { q, type, location } = req.query;
 
-    const filter = { status: 'Active' };
+    const filter = { status: 'Active', isDeleted: { $ne: true } };
 
     if (type && type !== 'All') {
       filter.employmentType = new RegExp(type, 'i');
@@ -981,7 +981,7 @@ export const applyToJob = async (req, res) => {
     }
 
     const job = await Job.findById(jobId);
-    if (!job || job.status !== 'Active') {
+    if (!job || job.status !== 'Active' || job.isDeleted) {
       return res.status(404).json({ success: false, message: 'Job position not found or no longer active.' });
     }
 

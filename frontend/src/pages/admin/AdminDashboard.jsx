@@ -242,7 +242,7 @@ export const AdminDashboard = () => {
                 )}
 
                 {activeTab === 'jobs' && (
-                  <AdminJobManagement jobsList={jobsList} />
+                  <AdminJobManagement jobsList={jobsList} onRefresh={fetchData} />
                 )}
 
                 {activeTab === 'notifications' && (

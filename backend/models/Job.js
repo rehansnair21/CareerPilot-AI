@@ -74,12 +74,20 @@ const jobSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['Active', 'Draft', 'Closed'],
+      enum: ['Active', 'Draft', 'Closed', 'Deactivated'],
       default: 'Active',
     },
     applicationsCount: {
       type: Number,
       default: 0,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
     },
   },
   {
