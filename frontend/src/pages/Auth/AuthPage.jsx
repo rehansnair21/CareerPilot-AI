@@ -12,6 +12,8 @@ import {
   Briefcase,
   AlertCircle,
   CheckCircle,
+  Check,
+  X,
   Compass,
   Sparkles,
   Target,
@@ -163,56 +165,86 @@ export const AuthPage = ({ initialMode = 'login' }) => {
   const [regSuccess, setRegSuccess] = useState('');
   const [regLoading, setRegLoading] = useState(false);
 
-  // Live Registration Rule Engine
-  const validateRegField = (fieldName, value, currentData = regData) => {
-    if (value === undefined || value === null) return null;
-    const strVal = String(value).trim();
-    if (!strVal) return null;
-
-    switch (fieldName) {
-      case 'name': {
-        if (strVal.length < 2) return 'Full name must be at least 2 characters';
-        if (strVal.length > 80) return 'Full name cannot exceed 80 characters';
-        break;
-      }
-      case 'email': {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(strVal)) {
-          return 'Please enter a valid email address (e.g. user@gmail.com)';
-        }
-        break;
-      }
-      case 'password': {
-        if (strVal.length < 6) return 'Password must be at least 6 characters long';
-        break;
-      }
-      case 'confirmPassword': {
-        if (strVal !== currentData.password) return 'Passwords do not match';
-        break;
-      }
-      default:
-        return null;
+  // Exact Registration Password Rules
+  const validateRegistrationPassword = (password) => {
+    if (!password || (typeof password === 'string' && !password.trim())) {
+      return 'Password is required.';
+    }
+    if (typeof password !== 'string' || password.length < 8) {
+      return 'Password must be at least 8 characters long.';
+    }
+    if (!/[A-Z]/.test(password)) {
+      return 'Password must contain at least one uppercase letter.';
+    }
+    if (!/[a-z]/.test(password)) {
+      return 'Password must contain at least one lowercase letter.';
+    }
+    if (!/[0-9]/.test(password)) {
+      return 'Password must contain at least one number.';
+    }
+    const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password) || /[^A-Za-z0-9\s]/.test(password);
+    if (!hasSpecialChar) {
+      return 'Password must contain at least one special character.';
     }
     return null;
   };
 
-  // Instant Live Registration Input Handler
+  const validateRegistrationConfirmPassword = (confirmPassword, password) => {
+    if (!confirmPassword || (typeof confirmPassword === 'string' && !confirmPassword.trim())) {
+      return 'Please confirm your password.';
+    }
+    if (confirmPassword !== password) {
+      return 'Passwords do not match.';
+    }
+    return null;
+  };
+
+  // Password validation rules specification for registration checklist
+  const passwordRules = [
+    {
+      id: 'length',
+      label: 'At least 8 characters long',
+      valid: Boolean(regData.password && regData.password.length >= 8),
+    },
+    {
+      id: 'uppercase',
+      label: 'At least one uppercase letter (A–Z)',
+      valid: /[A-Z]/.test(regData.password || ''),
+    },
+    {
+      id: 'lowercase',
+      label: 'At least one lowercase letter (a–z)',
+      valid: /[a-z]/.test(regData.password || ''),
+    },
+    {
+      id: 'number',
+      label: 'At least one number (0–9)',
+      valid: /[0-9]/.test(regData.password || ''),
+    },
+    {
+      id: 'special',
+      label: 'At least one special character (e.g., @, #, $)',
+      valid: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(regData.password || '') || /[^A-Za-z0-9\s]/.test(regData.password || ''),
+    },
+  ];
+
+  const allPasswordRulesMet = passwordRules.every((r) => r.valid);
+
+  // Real-time mismatch flag for confirm password
+  const isConfirmPasswordMismatch = Boolean(
+    (regData.confirmPassword && regData.password !== regData.confirmPassword) ||
+    (regErrors.confirmPassword && regData.password !== regData.confirmPassword)
+  );
+
+  // Real-time Registration Input Handler
   const handleRegFieldChange = (fieldName, value) => {
-    setRegData((prev) => {
-      const updated = { ...prev, [fieldName]: value };
-      const fieldErr = validateRegField(fieldName, value, updated);
-
-      setRegErrors((prevErrors) => {
-        const newErrs = { ...prevErrors, [fieldName]: fieldErr };
-        if (fieldName === 'password' && updated.confirmPassword) {
-          newErrs.confirmPassword = validateRegField('confirmPassword', updated.confirmPassword, updated);
-        }
-        return newErrs;
-      });
-
-      return updated;
+    setRegData((prev) => ({ ...prev, [fieldName]: value }));
+    setRegErrors((prev) => {
+      if (!prev[fieldName]) return prev;
+      const copy = { ...prev };
+      delete copy[fieldName];
+      return copy;
     });
-
     setRegError('');
   };
 
@@ -361,38 +393,58 @@ export const AuthPage = ({ initialMode = 'login' }) => {
     setRegError('');
     setRegSuccess('');
 
-    // Comprehensive validation check before submit
+    const missingName = !regData.name || !regData.name.trim();
+    const shortName = !missingName && regData.name.trim().length < 2;
+    const missingEmail = !regData.email || !regData.email.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalidEmail = !missingEmail && !emailRegex.test(regData.email.trim());
+    const passErr = validateRegistrationPassword(regData.password);
+    const confirmErr = validateRegistrationConfirmPassword(regData.confirmPassword, regData.password);
+
     const errs = {};
-    if (!regData.name.trim()) {
-      errs.name = 'Please enter your full name';
-    } else if (regData.name.trim().length < 2) {
-      errs.name = 'Full name must be at least 2 characters';
-    }
-
-    if (!regData.email.trim()) {
-      errs.email = 'Please enter your email address';
-    } else {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(regData.email.trim())) {
-        errs.email = 'Please enter a valid email address (e.g. user@gmail.com)';
-      }
-    }
-
-    if (!regData.password) {
-      errs.password = 'Please enter a password';
-    } else if (regData.password.length < 6) {
-      errs.password = 'Password must be at least 6 characters long';
-    }
-
-    if (!regData.confirmPassword) {
-      errs.confirmPassword = 'Please confirm your password';
-    } else if (regData.password !== regData.confirmPassword) {
-      errs.confirmPassword = 'Passwords do not match';
-    }
+    if (missingName || shortName) errs.name = true;
+    if (missingEmail || invalidEmail) errs.email = true;
+    if (passErr) errs.password = true;
+    if (confirmErr) errs.confirmPassword = true;
 
     setRegErrors(errs);
-    if (Object.keys(errs).length > 0) {
-      setRegError('Please resolve errors in the registration form');
+
+    if (missingName && missingEmail && !regData.password) {
+      setRegError('Please fill in all required fields to register.');
+      e.target?.closest('form')?.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (missingName) {
+      setRegError('Please enter your full name.');
+      e.target?.closest('form')?.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (shortName) {
+      setRegError('Full name must be at least 2 characters.');
+      e.target?.closest('form')?.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (missingEmail) {
+      setRegError('Please enter your email address.');
+      e.target?.closest('form')?.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (invalidEmail) {
+      setRegError('Please enter a valid email address (e.g. user@gmail.com).');
+      e.target?.closest('form')?.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (!regData.password) {
+      setRegError('Password is required.');
+      return;
+    }
+    if (passErr) {
+      setRegError('Please satisfy all password requirements.');
+      return;
+    }
+    if (confirmErr) {
+      setRegError('Passwords do not match.');
       return;
     }
 
@@ -430,7 +482,8 @@ export const AuthPage = ({ initialMode = 'login' }) => {
         setRegSuccess('');
       }, 700);
     } else {
-      setRegError(result?.message || 'Registration failed');
+      setRegError(result?.message || 'Registration failed. Please try again.');
+      e.target?.closest('form')?.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -470,7 +523,7 @@ export const AuthPage = ({ initialMode = 'login' }) => {
 
         {/* ================= REGISTER FORM (Sign Up) ================= */}
         <div className="form-container sign-up-container">
-          <form onSubmit={handleRegisterSubmit} autoComplete="off">
+          <form onSubmit={handleRegisterSubmit} autoComplete="off" noValidate>
             {/* Dummy hidden inputs to intercept browser autofill */}
             <input type="text" name="prevent_autofill_user" style={{ display: 'none' }} tabIndex={-1} autoComplete="off" />
             <input type="password" name="prevent_autofill_pass" style={{ display: 'none' }} tabIndex={-1} autoComplete="off" />
@@ -489,15 +542,15 @@ export const AuthPage = ({ initialMode = 'login' }) => {
             <p className="subtitle">Register to unlock AI-powered career roadmaps & mentorship</p>
 
             {regError && (
-              <div className="alert alert-danger">
-                <AlertCircle size={16} />
-                <span>{regError}</span>
+              <div className="alert alert-danger" role="alert" style={{ width: '100%', boxSizing: 'border-box' }}>
+                <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                <span style={{ flex: 1, textAlign: 'left', lineHeight: '1.4' }}>{regError}</span>
               </div>
             )}
             {regSuccess && (
-              <div className="alert alert-success">
-                <CheckCircle size={16} />
-                <span>{regSuccess}</span>
+              <div className="alert alert-success" role="alert" style={{ width: '100%', boxSizing: 'border-box' }}>
+                <CheckCircle size={18} style={{ flexShrink: 0 }} />
+                <span style={{ flex: 1, textAlign: 'left', lineHeight: '1.4' }}>{regSuccess}</span>
               </div>
             )}
 
@@ -532,99 +585,198 @@ export const AuthPage = ({ initialMode = 'login' }) => {
 
             {/* Name Input */}
             <div className="input-group">
-              <input
-                type="text"
-                name="reg_fullname_field"
-                className="input-field"
-                style={regErrors.name ? { borderColor: '#f87171', backgroundColor: '#fef2f2' } : {}}
-                placeholder="Full Name"
-                value={regData.name}
-                onChange={(e) => handleRegFieldChange('name', e.target.value)}
-                autoComplete="off"
-                required
-              />
-              <User className="input-icon" size={18} />
-              {regErrors.name && (
-                <span className="field-error-msg" style={{ color: '#dc2626', fontSize: '11px', fontWeight: '600', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <AlertCircle size={12} /> {regErrors.name}
-                </span>
-              )}
+              <div style={{ position: 'relative', width: '100%' }}>
+                <input
+                  type="text"
+                  name="reg_fullname_field"
+                  className="input-field"
+                  style={regErrors.name ? { borderColor: '#f87171', backgroundColor: '#fef2f2' } : {}}
+                  placeholder="Full Name"
+                  value={regData.name}
+                  onChange={(e) => handleRegFieldChange('name', e.target.value)}
+                  autoComplete="off"
+                  required
+                />
+                <User className="input-icon" size={18} />
+              </div>
             </div>
 
             {/* Email Input */}
             <div className="input-group">
-              <input
-                type="email"
-                name="reg_email_field"
-                className="input-field"
-                style={regErrors.email ? { borderColor: '#f87171', backgroundColor: '#fef2f2' } : {}}
-                placeholder="Email Address (e.g. user@gmail.com)"
-                value={regData.email}
-                onChange={(e) => handleRegFieldChange('email', e.target.value)}
-                autoComplete="off"
-                required
-              />
-              <Mail className="input-icon" size={18} />
-              {regErrors.email && (
-                <span className="field-error-msg" style={{ color: '#dc2626', fontSize: '11px', fontWeight: '600', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <AlertCircle size={12} /> {regErrors.email}
-                </span>
-              )}
+              <div style={{ position: 'relative', width: '100%' }}>
+                <input
+                  type="email"
+                  name="reg_email_field"
+                  className="input-field"
+                  style={regErrors.email ? { borderColor: '#f87171', backgroundColor: '#fef2f2' } : {}}
+                  placeholder="Email Address (e.g. user@gmail.com)"
+                  value={regData.email}
+                  onChange={(e) => handleRegFieldChange('email', e.target.value)}
+                  autoComplete="off"
+                  required
+                />
+                <Mail className="input-icon" size={18} />
+              </div>
             </div>
 
             {/* Password Input */}
             <div className="input-group">
-              <input
-                type={showRegPassword ? 'text' : 'password'}
-                name="reg_password_field"
-                className="input-field"
-                style={regErrors.password ? { borderColor: '#f87171', backgroundColor: '#fef2f2' } : {}}
-                placeholder="Password (min. 6 chars)"
-                value={regData.password}
-                onChange={(e) => handleRegFieldChange('password', e.target.value)}
-                autoComplete="new-password"
-                required
-              />
-              <Lock className="input-icon" size={18} />
-              <button
-                type="button"
-                className="toggle-password"
-                onClick={() => setShowRegPassword(!showRegPassword)}
-              >
-                {showRegPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-              {regErrors.password && (
-                <span className="field-error-msg" style={{ color: '#dc2626', fontSize: '11px', fontWeight: '600', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <AlertCircle size={12} /> {regErrors.password}
-                </span>
-              )}
+              <div style={{ position: 'relative', width: '100%' }}>
+                <input
+                  type={showRegPassword ? 'text' : 'password'}
+                  id="reg-password-input"
+                  name="reg_password_field"
+                  className="input-field"
+                  style={regErrors.password && !allPasswordRulesMet ? { borderColor: '#f87171', backgroundColor: '#fef2f2' } : {}}
+                  placeholder="Password"
+                  value={regData.password}
+                  onChange={(e) => handleRegFieldChange('password', e.target.value)}
+                  autoComplete="new-password"
+                  required
+                />
+                <Lock className="input-icon" size={18} />
+                <button
+                  type="button"
+                  id="toggle-reg-password"
+                  className="toggle-password"
+                  aria-label={showRegPassword ? 'Hide password' : 'Show password'}
+                  title={showRegPassword ? 'Hide password' : 'Show password'}
+                  onClick={() => setShowRegPassword(!showRegPassword)}
+                >
+                  {showRegPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+
+              {/* Password Validation Requirements Checklist - only seen when typing the password */}
+              {regData.password && !allPasswordRulesMet ? (
+                <div
+                  id="password-requirements-checklist"
+                  style={{
+                    marginTop: '6px',
+                    padding: '8px 12px',
+                    backgroundColor: '#ffffff',
+                    border: '1.5px solid #e2e8f0',
+                    borderRadius: '10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                    textAlign: 'left',
+                  }}
+                >
+                  <span style={{ fontSize: '11px', fontWeight: '700', color: '#5A6C66', marginBottom: '2px' }}>
+                    Password Requirements:
+                  </span>
+                  {passwordRules.map((rule) => (
+                    <div
+                      key={rule.id}
+                      id={`pwd-rule-${rule.id}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontSize: '11.5px',
+                        fontWeight: '600',
+                        color: rule.valid ? '#16a34a' : '#dc2626',
+                        transition: 'color 0.2s ease',
+                      }}
+                    >
+                      {rule.valid ? (
+                        <Check size={13} strokeWidth={2.8} style={{ flexShrink: 0, color: '#16a34a' }} />
+                      ) : (
+                        <X size={13} strokeWidth={2.8} style={{ flexShrink: 0, color: '#dc2626' }} />
+                      )}
+                      <span>{rule.label}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : regData.password ? (
+                <div
+                  id="password-requirements-satisfied"
+                  style={{
+                    marginTop: '4px',
+                    fontSize: '11.5px',
+                    fontWeight: '600',
+                    color: '#16a34a',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '2px 4px',
+                    textAlign: 'left',
+                  }}
+                >
+                  <Check size={13} strokeWidth={2.8} style={{ flexShrink: 0, color: '#16a34a' }} />
+                  <span>Password meets all requirements</span>
+                </div>
+              ) : null}
             </div>
 
             {/* Confirm Password Input */}
             <div className="input-group">
-              <input
-                type={showRegConfirmPassword ? 'text' : 'password'}
-                name="reg_confirm_password_field"
-                className="input-field"
-                style={regErrors.confirmPassword ? { borderColor: '#f87171', backgroundColor: '#fef2f2' } : {}}
-                placeholder="Confirm Password"
-                value={regData.confirmPassword}
-                onChange={(e) => handleRegFieldChange('confirmPassword', e.target.value)}
-                autoComplete="new-password"
-                required
-              />
-              <Lock className="input-icon" size={18} />
-              <button
-                type="button"
-                className="toggle-password"
-                onClick={() => setShowRegConfirmPassword(!showRegConfirmPassword)}
-              >
-                {showRegConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-              {regErrors.confirmPassword && (
-                <span className="field-error-msg" style={{ color: '#dc2626', fontSize: '11px', fontWeight: '600', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <AlertCircle size={12} /> {regErrors.confirmPassword}
-                </span>
+              <div style={{ position: 'relative', width: '100%' }}>
+                <input
+                  type={showRegConfirmPassword ? 'text' : 'password'}
+                  id="reg-confirm-password-input"
+                  name="reg_confirm_password_field"
+                  className="input-field"
+                  style={isConfirmPasswordMismatch ? { borderColor: '#f87171', backgroundColor: '#fef2f2' } : {}}
+                  placeholder="Confirm Password"
+                  value={regData.confirmPassword}
+                  onChange={(e) => handleRegFieldChange('confirmPassword', e.target.value)}
+                  autoComplete="new-password"
+                  required
+                />
+                <Lock className="input-icon" size={18} />
+                <button
+                  type="button"
+                  id="toggle-reg-confirm-password"
+                  className="toggle-password"
+                  aria-label={showRegConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                  title={showRegConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                  onClick={() => setShowRegConfirmPassword(!showRegConfirmPassword)}
+                >
+                  {showRegConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+
+              {isConfirmPasswordMismatch && (
+                <div
+                  id="reg-confirm-password-error"
+                  style={{
+                    color: '#dc2626',
+                    fontSize: '11.5px',
+                    fontWeight: '600',
+                    marginTop: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    textAlign: 'left',
+                  }}
+                >
+                  <X size={13} strokeWidth={2.8} style={{ flexShrink: 0, color: '#dc2626' }} />
+                  <span>Passwords do not match.</span>
+                </div>
+              )}
+
+              {!isConfirmPasswordMismatch && regData.confirmPassword && regData.password === regData.confirmPassword && (
+                <div
+                  id="reg-confirm-password-success"
+                  style={{
+                    color: '#16a34a',
+                    fontSize: '11.5px',
+                    fontWeight: '600',
+                    marginTop: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    textAlign: 'left',
+                  }}
+                >
+                  <Check size={13} strokeWidth={2.8} style={{ flexShrink: 0, color: '#16a34a' }} />
+                  <span>Passwords match.</span>
+                </div>
               )}
             </div>
 
@@ -699,39 +851,43 @@ export const AuthPage = ({ initialMode = 'login' }) => {
 
             {/* Email / Username Input */}
             <div className="input-group">
-              <input
-                type="text"
-                name="login_email_field"
-                className="input-field"
-                placeholder="Email Address or Username"
-                value={loginData.email}
-                onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-                autoComplete="off"
-                required
-              />
-              <Mail className="input-icon" size={18} />
+              <div style={{ position: 'relative', width: '100%' }}>
+                <input
+                  type="text"
+                  name="login_email_field"
+                  className="input-field"
+                  placeholder="Email Address or Username"
+                  value={loginData.email}
+                  onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                  autoComplete="off"
+                  required
+                />
+                <Mail className="input-icon" size={18} />
+              </div>
             </div>
 
             {/* Password Input */}
             <div className="input-group">
-              <input
-                type={showLoginPassword ? 'text' : 'password'}
-                name="login_password_field"
-                className="input-field"
-                placeholder="Password"
-                value={loginData.password}
-                onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                autoComplete="new-password"
-                required
-              />
-              <Lock className="input-icon" size={18} />
-              <button
-                type="button"
-                className="toggle-password"
-                onClick={() => setShowLoginPassword(!showLoginPassword)}
-              >
-                {showLoginPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
+              <div style={{ position: 'relative', width: '100%' }}>
+                <input
+                  type={showLoginPassword ? 'text' : 'password'}
+                  name="login_password_field"
+                  className="input-field"
+                  placeholder="Password"
+                  value={loginData.password}
+                  onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                  autoComplete="new-password"
+                  required
+                />
+                <Lock className="input-icon" size={18} />
+                <button
+                  type="button"
+                  className="toggle-password"
+                  onClick={() => setShowLoginPassword(!showLoginPassword)}
+                >
+                  {showLoginPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             {/* Submit Button */}
@@ -771,6 +927,7 @@ export const AuthPage = ({ initialMode = 'login' }) => {
                   setIsRightPanelActive(false);
                   setRegError('');
                   setRegSuccess('');
+                  setRegErrors({});
                 }}
               >
                 Sign In

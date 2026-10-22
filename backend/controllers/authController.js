@@ -22,6 +22,39 @@ const generateToken = (id, email = '') => {
   );
 };
 
+export const validateRegistrationPassword = (password) => {
+  if (!password || (typeof password === 'string' && !password.trim())) {
+    return 'Password is required.';
+  }
+  if (typeof password !== 'string' || password.length < 8) {
+    return 'Password must be at least 8 characters long.';
+  }
+  if (!/[A-Z]/.test(password)) {
+    return 'Password must contain at least one uppercase letter.';
+  }
+  if (!/[a-z]/.test(password)) {
+    return 'Password must contain at least one lowercase letter.';
+  }
+  if (!/[0-9]/.test(password)) {
+    return 'Password must contain at least one number.';
+  }
+  const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password) || /[^A-Za-z0-9\s]/.test(password);
+  if (!hasSpecialChar) {
+    return 'Password must contain at least one special character.';
+  }
+  return null;
+};
+
+export const validateRegistrationConfirmPassword = (confirmPassword, password) => {
+  if (!confirmPassword || (typeof confirmPassword === 'string' && !confirmPassword.trim())) {
+    return 'Please confirm your password.';
+  }
+  if (confirmPassword !== password) {
+    return 'Passwords do not match.';
+  }
+  return null;
+};
+
 // @desc    Register a new user
 // @route   POST /api/auth/register
 // @access  Public
@@ -38,24 +71,35 @@ export const registerUser = async (req, res) => {
     }
 
     // 1. Validation
-    if (!name || !email || !password || !confirmPassword) {
+    if (!name || (typeof name === 'string' && !name.trim())) {
       return res.status(400).json({
         success: false,
         message: 'Please provide all required fields: name, email, password, and confirmPassword'
       });
     }
 
-    if (password !== confirmPassword) {
+    if (!email || (typeof email === 'string' && !email.trim())) {
       return res.status(400).json({
         success: false,
-        message: 'Passwords do not match'
+        message: 'Please provide all required fields: name, email, password, and confirmPassword'
       });
     }
 
-    if (password.length < 6) {
+    const passwordError = validateRegistrationPassword(password);
+    if (passwordError) {
       return res.status(400).json({
         success: false,
-        message: 'Password must be at least 6 characters long'
+        message: passwordError,
+        errors: { password: passwordError }
+      });
+    }
+
+    const confirmPasswordError = validateRegistrationConfirmPassword(confirmPassword, password);
+    if (confirmPasswordError) {
+      return res.status(400).json({
+        success: false,
+        message: confirmPasswordError,
+        errors: { confirmPassword: confirmPasswordError }
       });
     }
 

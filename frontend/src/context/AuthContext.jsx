@@ -46,11 +46,11 @@ export const AuthProvider = ({ children }) => {
       if (res.data && res.data.success) {
         return { success: true, message: res.data.message || 'Registration successful! Please log in.' };
       }
-      return { success: false, message: res.data?.message || 'Registration failed' };
+      return { success: false, message: res.data?.message || 'Registration failed', errors: res.data?.errors };
     } catch (error) {
       console.error('Registration error:', error);
       const message = error.response?.data?.message || error.message || 'Registration failed';
-      return { success: false, message };
+      return { success: false, message, errors: error.response?.data?.errors };
     }
   };
 
