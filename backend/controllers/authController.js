@@ -22,6 +22,23 @@ const generateToken = (id, email = '') => {
   );
 };
 
+export const validateRegistrationName = (name) => {
+  if (!name || (typeof name === 'string' && !name.trim())) {
+    return 'Full name is required.';
+  }
+  if (typeof name !== 'string') {
+    return 'Name can contain only letters and spaces.';
+  }
+  const trimmed = name.trim();
+  if (trimmed.length < 3 || trimmed.length > 50 || name.length > 50) {
+    return 'Name must be between 3 and 50 characters.';
+  }
+  if (!/^[a-zA-Z\s]+$/.test(name)) {
+    return 'Name can contain only letters and spaces.';
+  }
+  return null;
+};
+
 export const validateRegistrationPassword = (password) => {
   if (!password || (typeof password === 'string' && !password.trim())) {
     return 'Password is required.';
@@ -71,10 +88,12 @@ export const registerUser = async (req, res) => {
     }
 
     // 1. Validation
-    if (!name || (typeof name === 'string' && !name.trim())) {
+    const nameError = validateRegistrationName(name);
+    if (nameError) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide all required fields: name, email, password, and confirmPassword'
+        message: nameError,
+        errors: { name: nameError }
       });
     }
 

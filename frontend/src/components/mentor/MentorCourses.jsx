@@ -3137,7 +3137,7 @@ export const MentorCourses = ({ onCoursesUpdated }) => {
                     <h2 className="text-lg font-extrabold text-[#5D0D1A]">
                       {editingCourseId ? 'Edit Course' : 'Create New Course'}
                     </h2>
-                    <p className="text-xs text-[#5A6C66] font-medium">Fill in text-based course specifications, objectives, and prerequisites</p>
+                    <p className="text-xs text-[#5A6C66] font-medium">Fill in text-based course specifications and details</p>
                   </div>
                 </div>
                 <button
@@ -3353,102 +3353,6 @@ export const MentorCourses = ({ onCoursesUpdated }) => {
                     <button
                       type="button"
                       onClick={() => handleAddSkill()}
-                      className="px-4 py-2 rounded-xl bg-[#5D0D1A] text-[#FFF9EB] text-xs font-extrabold hover:bg-[#7A1424]"
-                    >
-                      <Plus size={16} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Learning Objectives */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-[#5D0D1A] flex items-center gap-1.5">
-                    <CheckSquare size={14} />
-                    Learning Objectives
-                  </label>
-                  <div className="space-y-1.5 mb-2">
-                    {formState.learningObjectives.map((obj, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between p-2.5 rounded-xl bg-[#FFF9EB] border border-[#9FB2AC]/70 text-xs font-semibold text-[#5D0D1A]"
-                      >
-                        <span>• {obj}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveLearningObjective(idx)}
-                          className="text-[#5A6C66] hover:text-red-600 p-1"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="e.g. Build scalable RESTful APIs with Express and MongoDB..."
-                      value={newObjectiveInput}
-                      onChange={(e) => setNewObjectiveInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAddLearningObjective();
-                        }
-                      }}
-                      className="flex-1 bg-[#FFF9EB] border border-[#9FB2AC] rounded-xl px-3.5 py-2 text-xs text-[#5D0D1A] focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddLearningObjective}
-                      className="px-4 py-2 rounded-xl bg-[#5D0D1A] text-[#FFF9EB] text-xs font-extrabold hover:bg-[#7A1424]"
-                    >
-                      <Plus size={16} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Prerequisites */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-[#5D0D1A] flex items-center gap-1.5">
-                    <HelpCircle size={14} />
-                    Prerequisites
-                  </label>
-                  <div className="space-y-1.5 mb-2">
-                    {formState.prerequisites.map((pre, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between p-2.5 rounded-xl bg-[#FFF9EB] border border-[#9FB2AC]/70 text-xs font-semibold text-[#5D0D1A]"
-                      >
-                        <span>• {pre}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemovePrerequisite(idx)}
-                          className="text-[#5A6C66] hover:text-red-600 p-1"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="e.g. Basic understanding of JavaScript ES6 concepts..."
-                      value={newPrerequisiteInput}
-                      onChange={(e) => setNewPrerequisiteInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAddPrerequisite();
-                        }
-                      }}
-                      className="flex-1 bg-[#FFF9EB] border border-[#9FB2AC] rounded-xl px-3.5 py-2 text-xs text-[#5D0D1A] focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddPrerequisite}
                       className="px-4 py-2 rounded-xl bg-[#5D0D1A] text-[#FFF9EB] text-xs font-extrabold hover:bg-[#7A1424]"
                     >
                       <Plus size={16} />

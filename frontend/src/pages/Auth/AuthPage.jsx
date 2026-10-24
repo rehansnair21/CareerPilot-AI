@@ -121,6 +121,24 @@ const OrDivider = () => (
   </div>
 );
 
+// ─── Full Name Validation Rules ───────────────────────────────────────────────
+export const validateRegistrationName = (name) => {
+  if (!name || (typeof name === 'string' && !name.trim())) {
+    return 'Full name is required.';
+  }
+  if (typeof name !== 'string') {
+    return 'Name can contain only letters and spaces.';
+  }
+  const trimmed = name.trim();
+  if (trimmed.length < 3 || trimmed.length > 50 || name.length > 50) {
+    return 'Name must be between 3 and 50 characters.';
+  }
+  if (!/^[a-zA-Z\s]+$/.test(name)) {
+    return 'Name can contain only letters and spaces.';
+  }
+  return null;
+};
+
 // ─── Main AuthPage Component ───────────────────────────────────────────────────
 export const AuthPage = ({ initialMode = 'login' }) => {
   const { user, login, register, loginWithGoogle } = useAuth();
@@ -159,6 +177,7 @@ export const AuthPage = ({ initialMode = 'login' }) => {
     role: 'student',
   });
   const [regErrors, setRegErrors] = useState({});
+  const [nameTouched, setNameTouched] = useState(false);
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
   const [regError, setRegError] = useState('');
@@ -239,13 +258,42 @@ export const AuthPage = ({ initialMode = 'login' }) => {
   // Real-time Registration Input Handler
   const handleRegFieldChange = (fieldName, value) => {
     setRegData((prev) => ({ ...prev, [fieldName]: value }));
-    setRegErrors((prev) => {
-      if (!prev[fieldName]) return prev;
-      const copy = { ...prev };
-      delete copy[fieldName];
-      return copy;
-    });
+
+    if (fieldName === 'name') {
+      setNameTouched(true);
+      const nameErr = validateRegistrationName(value);
+      setRegErrors((prev) => {
+        if (nameErr) {
+          return { ...prev, name: nameErr };
+        } else {
+          const copy = { ...prev };
+          delete copy.name;
+          return copy;
+        }
+      });
+    } else {
+      setRegErrors((prev) => {
+        if (!prev[fieldName]) return prev;
+        const copy = { ...prev };
+        delete copy[fieldName];
+        return copy;
+      });
+    }
     setRegError('');
+  };
+
+  const handleNameBlur = () => {
+    setNameTouched(true);
+    const err = validateRegistrationName(regData.name);
+    if (err) {
+      setRegErrors((prev) => ({ ...prev, name: err }));
+    } else {
+      setRegErrors((prev) => {
+        const copy = { ...prev };
+        delete copy.name;
+        return copy;
+      });
+    }
   };
 
   // Login Form State
@@ -264,6 +312,7 @@ export const AuthPage = ({ initialMode = 'login' }) => {
     setLoginData({ email: '', password: '', role: 'student' });
     setRegData({ name: '', email: '', password: '', confirmPassword: '', role: 'student' });
     setRegErrors({});
+    setNameTouched(false);
   }, []);
 
   // Roles definition with feature highlights
@@ -392,9 +441,9 @@ export const AuthPage = ({ initialMode = 'login' }) => {
     e.preventDefault();
     setRegError('');
     setRegSuccess('');
+    setNameTouched(true);
 
-    const missingName = !regData.name || !regData.name.trim();
-    const shortName = !missingName && regData.name.trim().length < 2;
+    const nameErr = validateRegistrationName(regData.name);
     const missingEmail = !regData.email || !regData.email.trim();
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const invalidEmail = !missingEmail && !emailRegex.test(regData.email.trim());
@@ -402,26 +451,15 @@ export const AuthPage = ({ initialMode = 'login' }) => {
     const confirmErr = validateRegistrationConfirmPassword(regData.confirmPassword, regData.password);
 
     const errs = {};
-    if (missingName || shortName) errs.name = true;
+    if (nameErr) errs.name = nameErr;
     if (missingEmail || invalidEmail) errs.email = true;
     if (passErr) errs.password = true;
     if (confirmErr) errs.confirmPassword = true;
 
     setRegErrors(errs);
 
-    if (missingName && missingEmail && !regData.password) {
-      setRegError('Please fill in all required fields to register.');
-      e.target?.closest('form')?.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
-    if (missingName) {
-      setRegError('Please enter your full name.');
-      e.target?.closest('form')?.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-    if (shortName) {
-      setRegError('Full name must be at least 2 characters.');
+    if (nameErr) {
+      setRegError(nameErr);
       e.target?.closest('form')?.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -449,7 +487,11 @@ export const AuthPage = ({ initialMode = 'login' }) => {
     }
 
     setRegLoading(true);
-    const result = await register(regData);
+    const result = await register({
+      ...regData,
+      name: regData.name.trim(),
+      fullName: regData.name.trim(),
+    });
     setRegLoading(false);
 
     if (result && result.success) {
@@ -474,6 +516,7 @@ export const AuthPage = ({ initialMode = 'login' }) => {
         role: 'student',
       });
       setRegErrors({});
+      setNameTouched(false);
 
       // Slide smoothly to Login panel after short pause
       setTimeout(() => {
@@ -588,17 +631,44 @@ export const AuthPage = ({ initialMode = 'login' }) => {
               <div style={{ position: 'relative', width: '100%' }}>
                 <input
                   type="text"
+                  id="reg-fullname-input"
                   name="reg_fullname_field"
                   className="input-field"
-                  style={regErrors.name ? { borderColor: '#f87171', backgroundColor: '#fef2f2' } : {}}
+                  style={
+                    regErrors.name
+                      ? { borderColor: '#f87171', backgroundColor: '#fef2f2' }
+                      : nameTouched && regData.name.trim().length >= 3 && !regErrors.name
+                      ? { borderColor: '#86efac' }
+                      : {}
+                  }
                   placeholder="Full Name"
                   value={regData.name}
                   onChange={(e) => handleRegFieldChange('name', e.target.value)}
+                  onBlur={handleNameBlur}
                   autoComplete="off"
                   required
                 />
                 <User className="input-icon" size={18} />
               </div>
+              {regErrors.name && (
+                <div
+                  id="reg-fullname-error"
+                  className="field-error"
+                  style={{
+                    color: '#dc2626',
+                    fontSize: '11.5px',
+                    fontWeight: '600',
+                    marginTop: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    textAlign: 'left',
+                  }}
+                >
+                  <X size={13} strokeWidth={2.8} style={{ flexShrink: 0, color: '#dc2626' }} />
+                  <span>{typeof regErrors.name === 'string' ? regErrors.name : 'Full name is required.'}</span>
+                </div>
+              )}
             </div>
 
             {/* Email Input */}
@@ -928,6 +998,7 @@ export const AuthPage = ({ initialMode = 'login' }) => {
                   setRegError('');
                   setRegSuccess('');
                   setRegErrors({});
+                  setNameTouched(false);
                 }}
               >
                 Sign In
