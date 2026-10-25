@@ -556,11 +556,11 @@ export const AdminCourseManagement = () => {
                       <tr key={c._id} className="hover:bg-[#FFF9EB]/60 transition-colors group">
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#5D0D1A] to-[#7A1424] text-[#FFF9EB] font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs overflow-hidden border border-[#9FB2AC]/40">
+                            <div className="w-10 h-10 rounded-xl bg-[#f5f5f5] text-[#5D0D1A] font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs overflow-hidden border border-[#9FB2AC]/40">
                               {c.thumbnail ? (
-                                <img src={c.thumbnail} alt={c.title} className="w-full h-full object-cover" />
+                                <img src={c.thumbnail} alt={c.title} className="w-full h-full object-contain object-center block" />
                               ) : (
-                                <BookOpen size={18} />
+                                <BookOpen size={18} className="text-[#5D0D1A]" />
                               )}
                             </div>
                             <div className="min-w-0">
@@ -942,15 +942,15 @@ export const AdminCourseManagement = () => {
               {/* Modal Top Header */}
               <div className="p-5 bg-gradient-to-r from-[#FFF9EB] via-[#F7EED8] to-[#FFF9EB] border-b border-[#9FB2AC] flex items-center justify-between">
                 <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-[#5D0D1A] to-[#7A1424] text-[#FFF9EB] font-bold flex items-center justify-center overflow-hidden shadow-md shrink-0">
+                  <div className="w-11 h-11 rounded-xl bg-[#f5f5f5] text-[#5D0D1A] font-bold flex items-center justify-center overflow-hidden shadow-md shrink-0 border border-[#9FB2AC]">
                     {courseDetails?.course?.thumbnail ? (
                       <img
                         src={courseDetails.course.thumbnail}
                         alt="Thumbnail"
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain object-center block"
                       />
                     ) : (
-                      <GraduationCap size={24} />
+                      <GraduationCap size={24} className="text-[#5D0D1A]" />
                     )}
                   </div>
                   <div>
@@ -1006,6 +1006,15 @@ export const AdminCourseManagement = () => {
                   {/* Tab 1: Overview */}
                   {modalActiveTab === 'overview' && (
                     <div className="space-y-5">
+                      {courseDetails?.course?.thumbnail && (
+                        <div className="w-full max-h-72 rounded-2xl bg-[#f5f5f5] border border-[#9FB2AC] overflow-hidden flex items-center justify-center shadow-xs">
+                          <img
+                            src={courseDetails.course.thumbnail}
+                            alt={courseDetails.course.title}
+                            className="w-full h-auto max-h-72 object-contain object-center block"
+                          />
+                        </div>
+                      )}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div className="bg-[#FFF9EB] p-3 rounded-xl border border-[#9FB2AC]">
                           <p className="text-[10px] font-extrabold text-[#5A6C66] uppercase">Difficulty</p>

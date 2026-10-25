@@ -664,23 +664,23 @@ export const StudentCourses = ({ initialOpenCourseId }) => {
                       className="bg-white rounded-[22px] border border-[#9FB2AC] shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between overflow-hidden group hover:-translate-y-1"
                     >
                       {/* Thumbnail Header */}
-                      <div className="relative h-44 bg-gradient-to-br from-[#5D0D1A] to-[#420912] overflow-hidden flex items-center justify-center p-4">
+                      <div className="relative w-full overflow-hidden bg-[#f5f5f5] flex items-center justify-center border-b border-[#9FB2AC]/30">
                         {course.thumbnail ? (
                           <img
                             src={course.thumbnail}
                             alt={course.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500"
+                            className="w-full h-auto max-h-[260px] object-contain object-center block"
                           />
                         ) : (
-                          <div className="text-center text-[#FFF9EB] space-y-2 p-4">
+                          <div className="w-full h-44 flex flex-col items-center justify-center text-center text-[#FFF9EB] space-y-2 p-4 bg-gradient-to-br from-[#5D0D1A] to-[#420912]">
                             <BookOpen size={36} className="mx-auto opacity-80" />
                             <span className="text-xs font-extrabold line-clamp-1">{course.title}</span>
                           </div>
                         )}
-                        <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-[#FFF9EB]/90 backdrop-blur-md text-[#5D0D1A] text-[10px] font-black shadow-xs border border-[#9FB2AC]">
+                        <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-[#FFF9EB]/90 backdrop-blur-md text-[#5D0D1A] text-[10px] font-black shadow-xs border border-[#9FB2AC] z-10 pointer-events-none">
                           {course.category || 'General'}
                         </span>
-                        <span className="absolute top-3 right-3 px-3 py-1 rounded-full bg-emerald-600/90 text-[#FFF9EB] text-[10px] font-black border border-emerald-300 flex items-center gap-1 shadow-xs">
+                        <span className="absolute top-3 right-3 px-3 py-1 rounded-full bg-emerald-600/90 text-[#FFF9EB] text-[10px] font-black border border-emerald-300 flex items-center gap-1 shadow-xs z-10 pointer-events-none">
                           <CheckCircle2 size={11} />
                           Enrolled ✓
                         </span>
@@ -797,25 +797,25 @@ export const StudentCourses = ({ initialOpenCourseId }) => {
                       className="bg-white rounded-[22px] border border-[#9FB2AC] shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between overflow-hidden group hover:-translate-y-1"
                     >
                       {/* Thumbnail */}
-                      <div className="relative h-44 bg-gradient-to-br from-[#5D0D1A] to-[#420912] overflow-hidden flex items-center justify-center p-4">
+                      <div className="relative w-full overflow-hidden bg-[#f5f5f5] flex items-center justify-center border-b border-[#9FB2AC]/30">
                         {course.thumbnail ? (
                           <img
                             src={course.thumbnail}
                             alt={course.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500"
+                            className="w-full h-auto max-h-[260px] object-contain object-center block"
                           />
                         ) : (
-                          <div className="text-center text-[#FFF9EB] space-y-2 p-4">
+                          <div className="w-full h-44 flex flex-col items-center justify-center text-center text-[#FFF9EB] space-y-2 p-4 bg-gradient-to-br from-[#5D0D1A] to-[#420912]">
                             <BookOpen size={36} className="mx-auto opacity-80" />
                             <span className="text-xs font-extrabold line-clamp-1">{course.title}</span>
                           </div>
                         )}
-                        <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-[#FFF9EB]/90 backdrop-blur-md text-[#5D0D1A] text-[10px] font-black shadow-xs border border-[#9FB2AC]">
+                        <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-[#FFF9EB]/90 backdrop-blur-md text-[#5D0D1A] text-[10px] font-black shadow-xs border border-[#9FB2AC] z-10 pointer-events-none">
                           {course.category}
                         </span>
 
                         {/* Price Badge */}
-                        <span className="absolute top-3 right-3 px-3 py-1 rounded-full bg-[#FFF9EB]/95 text-[#5D0D1A] text-[10px] font-black border border-[#9FB2AC] flex items-center gap-0.5 shadow-xs">
+                        <span className="absolute top-3 right-3 px-3 py-1 rounded-full bg-[#FFF9EB]/95 text-[#5D0D1A] text-[10px] font-black border border-[#9FB2AC] flex items-center gap-0.5 shadow-xs z-10 pointer-events-none">
                           {isPaidCourse ? (
                             <>
                               <IndianRupee size={11} />
@@ -1019,6 +1019,15 @@ export const StudentCourses = ({ initialOpenCourseId }) => {
               <div className="lg:col-span-4 bg-white rounded-[28px] border border-[#9FB2AC] shadow-xs overflow-hidden space-y-4 p-4 sticky top-6">
                 {/* Course Context Header */}
                 <div className="p-3 bg-[#FFF9EB] rounded-2xl border border-[#9FB2AC]/60 space-y-2">
+                  {selectedCourse.thumbnail && (
+                    <div className="w-full rounded-xl overflow-hidden border border-[#9FB2AC]/50 mb-2 bg-[#f5f5f5] flex items-center justify-center">
+                      <img
+                        src={selectedCourse.thumbnail}
+                        alt={selectedCourse.title}
+                        className="w-full h-auto max-h-56 object-contain object-center block"
+                      />
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-extrabold text-[#5D0D1A] uppercase tracking-wider">
                       {selectedCourse.category} • {selectedCourse.difficulty}

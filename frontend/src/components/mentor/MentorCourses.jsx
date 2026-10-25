@@ -534,6 +534,7 @@ export const MentorCourses = ({ onCoursesUpdated }) => {
       setFormState((prev) => ({ ...prev, thumbnail: reader.result }));
     };
     reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   // Skills tag manager
@@ -1880,15 +1881,15 @@ export const MentorCourses = ({ onCoursesUpdated }) => {
                 className="rounded-[22px] bg-white border border-[#9FB2AC] shadow-xs overflow-hidden flex flex-col justify-between transition-all"
               >
                 {/* Top Image Thumbnail Container */}
-                <div className="relative h-44 bg-gradient-to-tr from-[#5D0D1A] to-[#7A1424] overflow-hidden">
+                <div className="relative w-full overflow-hidden bg-[#f5f5f5] flex items-center justify-center border-b border-[#9FB2AC]/30">
                   {course.thumbnail ? (
                     <img
                       src={course.thumbnail}
                       alt={course.title}
-                      className="w-full h-full object-cover"
+                      className="w-full h-auto max-h-[260px] object-contain object-center block"
                     />
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-[#FFF9EB]/80 p-4 text-center">
+                    <div className="w-full h-44 flex flex-col items-center justify-center text-[#FFF9EB]/80 p-4 text-center bg-gradient-to-tr from-[#5D0D1A] to-[#7A1424]">
                       <BookOpen size={36} className="mb-1 text-[#FFF9EB]" />
                       <span className="text-xs font-bold uppercase tracking-wider">{course.category}</span>
                     </div>
@@ -3178,32 +3179,83 @@ export const MentorCourses = ({ onCoursesUpdated }) => {
 
                 {/* Course Thumbnail Image Upload */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-[#5D0D1A]">Course Thumbnail Image</label>
-                  <div className="flex items-center gap-4">
-                    <div className="w-32 h-20 rounded-xl bg-[#FFF9EB] border border-[#9FB2AC] overflow-hidden flex items-center justify-center shrink-0">
-                      {formState.thumbnail ? (
-                        <img src={formState.thumbnail} alt="Thumbnail preview" className="w-full h-full object-cover" />
-                      ) : (
-                        <BookOpen size={24} className="text-[#5A6C66]" />
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-[#9FB2AC] text-[#5D0D1A] text-xs font-bold hover:bg-[#FFF9EB] transition-colors"
-                      >
-                        <Camera size={15} />
-                        <span>Upload Image</span>
-                      </button>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/png, image/jpeg, image/webp"
-                        onChange={handleThumbnailUpload}
-                        className="hidden"
-                      />
-                      <p className="text-[11px] text-[#5A6C66]">PNG, JPG or WebP up to 3 MB.</p>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-[#5D0D1A]">Course Thumbnail Image</label>
+                    <span className="text-[11px] font-semibold text-[#5A6C66]">16:9 ratio recommended (e.g. 1280×720)</span>
+                  </div>
+                  <div className="border border-[#9FB2AC] rounded-2xl p-4 bg-[#FFF9EB]/40 space-y-3">
+                    <div className="flex flex-col sm:flex-row items-center gap-4">
+                      {/* Thumbnail Preview Area */}
+                      <div className="relative w-full sm:w-60 rounded-xl bg-[#f5f5f5] border border-[#9FB2AC] overflow-hidden flex items-center justify-center shrink-0 shadow-xs group/thumb">
+                        {formState.thumbnail ? (
+                          <>
+                            <img
+                              src={formState.thumbnail}
+                              alt="Thumbnail preview"
+                              className="w-full h-auto max-h-52 object-contain object-center block"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="px-2.5 py-1.5 rounded-lg bg-white/95 hover:bg-white text-[#5D0D1A] text-[11px] font-bold shadow-xs transition-all"
+                              >
+                                Change
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFormState((prev) => ({ ...prev, thumbnail: '' }))}
+                                className="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold shadow-xs transition-all"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                            <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/60 text-[#FFF9EB] text-[9px] font-bold">
+                              Full Preview
+                            </span>
+                          </>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-center p-4 text-[#5A6C66] space-y-1 bg-[#f5f5f5] w-full min-h-[140px]">
+                            <BookOpen size={28} className="text-[#5D0D1A]/60" />
+                            <span className="text-[10px] font-bold text-[#5D0D1A]">No Thumbnail</span>
+                            <span className="text-[9px] text-[#5A6C66]">Card Preview Area</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Controls */}
+                      <div className="space-y-2 flex-1 w-full text-center sm:text-left">
+                        <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start">
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-[#9FB2AC] text-[#5D0D1A] text-xs font-bold hover:bg-[#FFF9EB] transition-colors shadow-2xs"
+                          >
+                            <Camera size={15} />
+                            <span>{formState.thumbnail ? 'Replace Thumbnail' : 'Upload Thumbnail'}</span>
+                          </button>
+                          {formState.thumbnail && (
+                            <button
+                              type="button"
+                              onClick={() => setFormState((prev) => ({ ...prev, thumbnail: '' }))}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-100 transition-colors"
+                            >
+                              <Trash2 size={13} />
+                              <span>Remove</span>
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/png, image/jpeg, image/webp"
+                          onChange={handleThumbnailUpload}
+                          className="hidden"
+                        />
+                        <p className="text-[11px] text-[#5A6C66]">
+                          PNG, JPG or WebP up to 3 MB. The image will fit the course card area edge-to-edge.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -4301,6 +4353,15 @@ export const MentorCourses = ({ onCoursesUpdated }) => {
                 <div className="p-6 md:p-8 overflow-y-auto space-y-8 flex-1 custom-scrollbar">
                   {/* Course Header Banner */}
                   <div className="bg-[#FFF9EB]/50 rounded-[24px] p-6 border border-[#9FB2AC] space-y-6">
+                    {previewState.courseData.thumbnail && (
+                      <div className="w-full max-h-72 rounded-2xl overflow-hidden border border-[#9FB2AC] shadow-xs bg-[#f5f5f5] flex items-center justify-center">
+                        <img
+                          src={previewState.courseData.thumbnail}
+                          alt={previewState.courseData.title}
+                          className="w-full h-auto max-h-72 object-contain object-center block"
+                        />
+                      </div>
+                    )}
                     <div className="flex flex-col lg:flex-row justify-between gap-6">
                       <div className="space-y-3 max-w-2xl">
                         <div className="flex items-center gap-2 flex-wrap">

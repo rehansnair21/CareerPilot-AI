@@ -2362,3 +2362,23 @@ p.subtitle {
     text-align: center;
   }
 }
+
+/* Course Card Thumbnail Display - Fills container width, matches image aspect ratio with zero blank space on sides */
+.course-thumbnail-container {
+  position: relative;
+  width: 100%;
+  background-color: #f5f5f5;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.course-thumbnail {
+  width: 100%;
+  height: auto;
+  max-height: 280px;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+}
